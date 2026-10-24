@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Culture Co. Pre-Orders</title>
+<meta name="description" content="Pre-order fresh cultured yogurt and milk drinks from Culture Co.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fbf7f0; --card:#ffffff; --ink:#2b2420; --muted:#7a6f66; --line:#ece4d8;
+  --accent:#d9546e; --accent-ink:#ffffff; --soft:#fdecef; --berry:#5b5bd6; --ok:#2f8f5b;
+  --radius:16px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1b1715; --card:#26201d; --ink:#f3ece4; --muted:#b3a79c; --line:#3a312c;
+    --accent:#ef7690; --accent-ink:#1b1715; --soft:#3a2328; --berry:#9a9af0; --ok:#6cc495;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1b1715; --card:#26201d; --ink:#f3ece4; --muted:#b3a79c; --line:#3a312c;
+  --accent:#ef7690; --accent-ink:#1b1715; --soft:#3a2328; --berry:#9a9af0; --ok:#6cc495;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 120px}
+header{text-align:center;padding:12px 0 8px}
+h1{font-family:Fraunces,serif;font-size:34px;margin:0;letter-spacing:-.5px}
+.tag{color:var(--muted);margin:4px 0 0}
+.demo{background:var(--soft);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:13px;margin:12px 0;text-align:center}
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;margin:16px 0}
+.tabs button{flex:1;border:0;background:none;color:var(--muted);padding:10px;border-radius:999px;font:600 14px Inter,sans-serif;cursor:pointer}
+.tabs button.on{background:var(--accent);color:var(--accent-ink)}
+h2{font-family:Fraunces,serif;font-size:20px;margin:22px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pname{font-weight:600}
+.psub{color:var(--muted);font-size:13px}
+.step{display:flex;align-items:center;gap:8px}
+.step button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:18px;cursor:pointer}
+.step span{min-width:18px;text-align:center;font-weight:600}
+.batches{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.batch{min-width:140px;flex:0 0 auto}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:600}
+.pill.ok{background:transparent;border:1px solid var(--ok);color:var(--ok)}
+label{display:block;font-weight:500;margin:12px 0 4px;font-size:14px}
+input,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:15px Inter,sans-serif}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:500 14px Inter,sans-serif;cursor:pointer}
+.seg button.on{border-color:var(--accent);background:var(--soft);color:var(--accent)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px}
+.bar .in{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.total{flex:1}
+.total b{font-size:20px}
+.btn{border:0;background:var(--accent);color:var(--accent-ink);padding:13px 20px;border-radius:12px;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.wide{width:100%;margin-top:14px}
+.err{color:var(--accent);font-size:13px;margin-top:8px;min-height:1em}
+.big{font-family:Fraunces,serif;font-size:40px;margin:4px 0}
+.center{text-align:center}
+.hide{display:none}
+.lines div{display:flex;justify-content:space-between;padding:3px 0}
+.note{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Culture Co.</h1>
+    <p class="tag">Fresh cultured yogurt &amp; milk drinks · made-to-order</p>
+  </header>
+  <div id="demo" class="demo hide">Demo mode: orders are saved on this device only until Firebase is connected.</div>
+
+  <div class="tabs">
+    <button id="tOrder" class="on">Order</button>
+    <button id="tTrack">Track my order</button>
+  </div>
+
+  <!-- ORDER -->
+  <section id="vOrder">
+    <h2>Upcoming batches</h2>
+    <div id="batches" class="batches"><div class="note">Loading…</div></div>
+    <p class="note">All items are pre-order and subject to availability. We assign your order to a batch after production.</p>
+
+    <div id="menu"></div>
+
+    <h2>Your details</h2>
+    <div class="card">
+      <label for="name">Name</label>
+      <input id="name" autocomplete="name" maxlength="80">
+      <label for="phone">Mobile number or Messenger name</label>
+      <input id="phone" maxlength="80">
+      <label>Pickup or delivery</label>
+      <div class="seg">
+        <button id="fPick" class="on" type="button">Pickup</button>
+        <button id="fDel" type="button">Delivery (+₱20)</button>
+      </div>
+      <div id="addrWrap" class="hide">
+        <label for="addr">Delivery address</label>
+        <textarea id="addr" rows="2" maxlength="300"></textarea>
+      </div>
+      <label for="notes">Notes (optional)</label>
+      <input id="notes" maxlength="300">
+    </div>
+  </section>
+
+  <!-- DONE -->
+  <section id="vDone" class="hide">
+    <div class="card center">
+      <p class="note">Pre-order received!</p>
+      <p>Your queue number</p>
+      <div class="big" id="dQueue">#0</div>
+      <p>Order code: <b id="dCode"></b></p>
+      <p class="note">Save this code to track your order and see which batch it's in.</p>
+      <button class="btn wide" id="again">Place another order</button>
+    </div>
+  </section>
+
+  <!-- TRACK -->
+  <section id="vTrack" class="hide">
+    <h2>Track my order</h2>
+    <div class="card">
+      <label for="code">Order code</label>
+      <input id="code" placeholder="e.g. CC-7F3KQ2" autocapitalize="characters">
+      <button class="btn wide" id="lookup">Check status</button>
+      <div class="err" id="tErr"></div>
+    </div>
+    <div id="tResult"></div>
+  </section>
+</div>
+
+<div class="bar" id="bar">
+  <div class="in">
+    <div class="total"><div class="note" id="count">No items yet</div><b id="sum">₱0</b></div>
+    <button class="btn" id="submit" disabled>Place pre-order</button>
+  </div>
+  <div class="err" id="oErr" style="max-width:560px;margin:4px auto 0"></div>
+</div>
+
+<script type="module">
+/* ===== 1. PASTE YOUR FIREBASE CONFIG HERE (Firebase console → Project settings → Your apps → Web) ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBZQ3ZAolbnRa2Azsy9zIPA0MLKZQwfXWQ",
+  authDomain: "culture-co-31e8f.firebaseapp.com",
+  projectId: "culture-co-31e8f",
+  storageBucket: "culture-co-31e8f.firebasestorage.app",
+  messagingSenderId: "146283889017",
+  appId: "1:146283889017:web:3e0650165b8f6f1f766fa8",
+  measurementId: "G-7BWNEGBVGP"
+};
+const DEMO = firebaseConfig.apiKey.startsWith("PASTE");
+
+/* ===== 2. MENU & PRICING ===== */
+const MENU = [
+  { group: "Cultured Yogurt 500g", items: [
+    { id: "y500-plain", name: "Plain", price: 120 },
+    { id: "y500-straw", name: "Strawberry", price: 140 },
+    { id: "y500-blue",  name: "Blueberry", price: 140 } ]},
+  { group: "Cultured Yogurt 100g", bundle: "y100", sub: "₱35 each · 3 for ₱100 (mix flavors)", items: [
+    { id: "y100-plain", name: "Plain", price: 35 },
+    { id: "y100-straw", name: "Strawberry", price: 35 },
+    { id: "y100-blue",  name: "Blueberry", price: 35 } ]},
+  { group: "Cultured Milk Drink 200ml", bundle: "d200", sub: "₱35 each · 3 for ₱100 (mix flavors)", items: [
+    { id: "d200-plain", name: "Plain", price: 35 },
+    { id: "d200-straw", name: "Strawberry", price: 35 },
+    { id: "d200-blue",  name: "Blueberry", price: 35 } ]},
+  { group: "Greek Yogurt 350g", items: [
+    { id: "g350-pure", name: "Pure", price: 140 } ]}
+];
+const DELIVERY_FEE = 20;
+
+/* ===== AUTO BATCHES: every Mon / Wed / Fri, 8 slots each =====
+   To close a batch, change its slots or mark slots taken, add a document in
+   Firestore "batches" with the same `date` (YYYY-MM-DD); its fields win. */
+const BATCH_DAYS = { 1: "Batch 1", 3: "Batch 2", 5: "Batch 3" }; // 1=Mon, 3=Wed, 5=Fri
+const DEFAULT_LIMIT = 8;
+const SHOW_BATCHES = 3;
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function autoBatches(count = SHOW_BATCHES){
+  const out = [], d = new Date();
+  for (let i = 0; out.length < count && i < 21; i++){
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    const label = BATCH_DAYS[x.getDay()];
+    if (label) out.push({ id: ymd(x), label, date: ymd(x), limit: DEFAULT_LIMIT, taken: 0, status: "open" });
+  }
+  return out;
+}
+function batchFromDate(date){
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return null;
+  const x = new Date(date + "T00:00");
+  return { id: date, label: BATCH_DAYS[x.getDay()] || "Batch", date, limit: DEFAULT_LIMIT, taken: 0, status: "open" };
+}
+function mergeBatches(auto, overrides){
+  const byDate = {};
+  for (const o of overrides) if (o.date) byDate[o.date] = o;
+  const merged = auto.map(b => byDate[b.date] ? { ...b, ...byDate[b.date] } : b);
+  // extra one-off batches you add in Firestore on other days also show
+  for (const o of overrides) if (!auto.some(b => b.date === o.date)) merged.push({ limit: DEFAULT_LIMIT, taken: 0, status: "open", ...o });
+  return merged.filter(b => b.status !== "hidden").sort((a,b) => a.date.localeCompare(b.date));
+}
+
+/* ===== 3. DATA LAYER (Firebase, or on-device demo) ===== */
+const mem = {};
+const ls = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return mem[k] ?? null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch { mem[k] = v; } }
+};
+const demoStore = {
+  async listBatches(){ return autoBatches(); },
+  async createOrder(data){
+    const n = (ls.get("cc_queue") || 1); ls.set("cc_queue", n+1);
+    const id = makeCode(); const orders = ls.get("cc_orders") || {};
+    orders[id] = { ...data, queueNumber: n, status: "pending", batchId: null, createdAt: Date.now() };
+    ls.set("cc_orders", orders); return { id, queueNumber: n };
+  },
+  async getOrder(id){ return (ls.get("cc_orders") || {})[id] || null; },
+  async getBatch(id){ return batchFromDate(id); }
+};
+
+async function firebaseStore(){
+  const V = "10.12.2";
+  const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+  const fs = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+  const db = fs.getFirestore(initializeApp(firebaseConfig));
+  return {
+    async listBatches(){
+      const auto = autoBatches();
+      const last = auto.length ? auto.at(-1).date : ymd(new Date());
+      let overrides = [];
+      try {
+        const q = fs.query(fs.collection(db,"batches"), fs.where("date",">=",ymd(new Date())), fs.where("date","<=",last));
+        overrides = (await fs.getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e){ console.warn("Batch overrides unavailable, showing default schedule", e); }
+      return mergeBatches(auto, overrides);
+    },
+    async createOrder(data){
+      const id = makeCode();
+      const qRef = fs.doc(db,"meta","queue"), oRef = fs.doc(db,"orders",id);
+      const queueNumber = await fs.runTransaction(db, async t => {
+        const s = await t.get(qRef);
+        const n = s.exists() ? s.data().next : 1;
+        s.exists() ? t.update(qRef,{ next: n+1 }) : t.set(qRef,{ next: 2 });
+        t.set(oRef, { ...data, queueNumber: n, status: "pending", batchId: null, createdAt: fs.serverTimestamp() });
+        return n;
+      });
+      return { id, queueNumber };
+    },
+    async getOrder(id){ const s = await fs.getDoc(fs.doc(db,"orders",id)); return s.exists() ? s.data() : null; },
+    async getBatch(id){
+      // batchId on an order can be a date ("2026-10-26") or a Firestore batch document ID
+      try { const s = await fs.getDoc(fs.doc(db,"batches",id)); if (s.exists()) return { id, ...s.data() }; } catch {}
+      return batchFromDate(id);
+    }
+  };
+}
+function makeCode(){
+  const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "CC-";
+  const r = crypto.getRandomValues(new Uint32Array(6));
+  for (const x of r) s += c[x % c.length]; return s;
+}
+
+/* ===== 4. UI ===== */
+const $ = id => document.getElementById(id);
+const peso = n => "₱" + n.toLocaleString("en-PH");
+const cart = {}; let fulfilment = "pickup"; let store;
+
+function renderMenu(){
+  $("menu").innerHTML = MENU.map(g => `
+    <h2>${g.group}</h2>${g.sub ? `<p class="note" style="margin-top:-6px">${g.sub}</p>` : ""}
+    ${g.items.map(i => `
+      <div class="card row">
+        <div><div class="pname">${i.name}</div><div class="psub">${peso(i.price)}</div></div>
+        <div class="step">
+          <button data-id="${i.id}" data-d="-1" aria-label="Remove ${i.name}">−</button>
+          <span id="q-${i.id}">0</span>
+          <button data-id="${i.id}" data-d="1" aria-label="Add ${i.name}">+</button>
+        </div>
+      </div>`).join("")}`).join("");
+  $("menu").onclick = e => {
+    const b = e.target.closest("button[data-id]"); if (!b) return;
+    const id = b.dataset.id; cart[id] = Math.max(0, (cart[id]||0) + +b.dataset.d);
+    $("q-"+id).textContent = cart[id]; updateTotal();
+  };
+}
+function calc(){
+  const items = []; let subtotal = 0; const bundles = {};
+  for (const g of MENU) for (const i of g.items){
+    const q = cart[i.id] || 0; if (!q) continue;
+    items.push({ id: i.id, name: `${g.group} – ${i.name}`, qty: q, price: i.price });
+    if (g.bundle) bundles[g.bundle] = (bundles[g.bundle]||0) + q; else subtotal += q * i.price;
+  }
+  for (const k in bundles){ const q = bundles[k]; subtotal += Math.floor(q/3)*100 + (q%3)*35; }
+  const fee = fulfilment === "delivery" && items.length ? DELIVERY_FEE : 0;
+  return { items, subtotal, fee, total: subtotal + fee, count: items.reduce((a,b)=>a+b.qty,0) };
+}
+function updateTotal(){
+  const c = calc();
+  $("sum").textContent = peso(c.total);
+  $("count").textContent = c.count ? `${c.count} item${c.count>1?"s":""}${c.fee?" · incl. ₱20 delivery":""}` : "No items yet";
+  $("submit").disabled = !c.count;
+}
+async function renderBatches(){
+  try {
+    const list = await store.listBatches();
+    $("batches").innerHTML = list.length ? list.map(b => {
+      const left = Math.max(0,(b.limit||0)-(b.taken||0));
+      const d = new Date(b.date+"T00:00").toLocaleDateString("en-PH",{weekday:"short",month:"short",day:"numeric"});
+      return `<div class="card batch"><div class="pname">${b.label||"Batch"}</div><div class="psub">${d}</div>
+        <span class="pill ${left>0&&b.status!=="closed"?"ok":""}">${b.status==="closed"||!left?"Full":left+" slots left"}</span></div>`;
+    }).join("") : `<div class="note">Next batches will be posted soon. You can still pre-order now.</div>`;
+  } catch(e){ $("batches").innerHTML = `<div class="note">Couldn't load batches right now.</div>`; }
+}
+function show(v){
+  for (const s of ["vOrder","vDone","vTrack"]) $(s).classList.toggle("hide", s!==v);
+  $("bar").classList.toggle("hide", v!=="vOrder");
+  $("tOrder").classList.toggle("on", v!=="vTrack"); $("tTrack").classList.toggle("on", v==="vTrack");
+  window.scrollTo(0,0);
+}
+$("tOrder").onclick = () => show("vOrder");
+$("tTrack").onclick = () => show("vTrack");
+$("fPick").onclick = () => { fulfilment="pickup"; $("fPick").classList.add("on"); $("fDel").classList.remove("on"); $("addrWrap").classList.add("hide"); updateTotal(); };
+$("fDel").onclick = () => { fulfilment="delivery"; $("fDel").classList.add("on"); $("fPick").classList.remove("on"); $("addrWrap").classList.remove("hide"); updateTotal(); };
+$("again").onclick = () => { for (const k in cart) cart[k]=0; renderMenu(); updateTotal(); show("vOrder"); };
+
+$("submit").onclick = async () => {
+  const c = calc(), name = $("name").value.trim(), phone = $("phone").value.trim(), addr = $("addr").value.trim();
+  $("oErr").textContent = "";
+  if (!name || !phone) { $("oErr").textContent = "Please add your name and contact."; return; }
+  if (fulfilment==="delivery" && !addr) { $("oErr").textContent = "Please add your delivery address."; return; }
+  $("submit").disabled = true; $("submit").textContent = "Sending…";
+  try {
+    const r = await store.createOrder({ name, contact: phone, fulfilment, address: fulfilment==="delivery"?addr:"",
+      notes: $("notes").value.trim(), items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total });
+    $("dQueue").textContent = "#" + r.queueNumber; $("dCode").textContent = r.id;
+    try { localStorage.setItem("cc_last", r.id); } catch {}
+    show("vDone");
+  } catch(e){ $("oErr").textContent = "Something went wrong. Please try again."; console.error(e); }
+  $("submit").textContent = "Place pre-order"; updateTotal();
+};
+
+const STATUS = { pending:"Pre-order received", assigned:"Assigned to a batch", ready:"Ready for pickup / out for delivery",
+  completed:"Completed", cancelled:"Cancelled" };
+$("lookup").onclick = async () => {
+  const code = $("code").value.trim().toUpperCase(); $("tErr").textContent = ""; $("tResult").innerHTML = "";
+  if (!code) return;
+  try {
+    const o = await store.getOrder(code);
+    if (!o) { $("tErr").textContent = "No order found with that code."; return; }
+    const b = o.batchId ? await store.getBatch(o.batchId) : null;
+    $("tResult").innerHTML = `<div class="card">
+      <div class="row"><b>${code}</b><span class="pill">${STATUS[o.status]||o.status}</span></div>
+      <p>Queue number <b>#${o.queueNumber}</b><br>Batch: <b>${b ? `${b.label} · ${b.date}` : "To be assigned after production"}</b></p>
+      <div class="lines">${o.items.map(i=>`<div><span>${i.qty}× ${i.name}</span></div>`).join("")}
+      ${o.deliveryFee?`<div><span>Delivery</span><span>${peso(o.deliveryFee)}</span></div>`:""}
+      <div><b>Total</b><b>${peso(o.total)}</b></div></div></div>`;
+  } catch(e){ $("tErr").textContent = "Couldn't check right now. Please try again."; }
+};
+
+(async () => {
+  store = DEMO ? demoStore : await firebaseStore();
+  if (DEMO) $("demo").classList.remove("hide");
+  try { const last = localStorage.getItem("cc_last"); if (last) $("code").value = last; } catch {}
+  renderMenu(); updateTotal(); renderBatches();
+})();
+</script>
+</body>
+</html>
