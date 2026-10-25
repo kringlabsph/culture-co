@@ -100,8 +100,9 @@ section{padding:110px 0}
 @media (max-width:900px){
   .hero{padding:110px 0 64px;min-height:0}
   .hero .wrap{grid-template-columns:1fr;gap:72px}
-  .dial-wrap{width:min(420px,78vw);margin-top:20px}
-  .ringtext{display:none}
+  .dial-wrap{width:min(400px,72vw);margin-top:28px}
+  .ring{inset:-10px}.ring.two{inset:-22px}
+  .ringtext{inset:-46px}
 }
 
 /* batches strip */
@@ -110,7 +111,9 @@ section{padding:110px 0}
 .batches h2{font-size:34px}
 .batches p{color:var(--ink-2);font-size:15px;margin-top:6px}
 .days{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.day{background:var(--milk);border:1px solid var(--line);border-radius:22px;padding:18px 20px;display:flex;align-items:center;gap:16px}
+.day{background:var(--milk);border:1.5px solid var(--line);border-radius:22px;padding:18px 20px;display:flex;align-items:center;gap:16px;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s var(--ease)}
+.day:hover{border-color:var(--sage)}
+.day[aria-pressed="true"]{border-color:var(--forest);box-shadow:0 0 0 3px rgba(47,70,48,.12)}
 .day .dn{font-family:var(--serif);font-size:30px;line-height:1;color:var(--forest)}
 .day .dd{font-size:13px;color:var(--ink-2)}
 .day .meta{flex:1}
@@ -118,7 +121,16 @@ section{padding:110px 0}
 .dots i{width:10px;height:10px;border-radius:50%;background:var(--rose);transform:scale(0);animation:pop .4s var(--ease) forwards}
 .dots i.taken{background:var(--sage-2)}
 @keyframes pop{to{transform:scale(1)}}
-.day .left{font-size:13px;font-weight:800;color:var(--forest);margin-top:4px}
+.day .left{font-size:13px;color:var(--ink-2);margin-top:8px;display:flex;flex-wrap:wrap;gap:2px 12px}
+.day .left b{color:var(--forest);font-weight:800}
+.soldout,.leftn{display:inline-block;margin-top:8px;font-size:13px;font-weight:800;border-radius:999px;padding:4px 12px}
+.leftn{background:var(--paper);color:var(--forest)}
+.soldout{background:var(--blush);color:#8f2f48}
+.setnote{font-size:14px;font-weight:700;color:#a52a4a;margin-top:10px}
+.setnote.ok{color:var(--forest)}
+.step button:disabled{opacity:.35;cursor:not-allowed}
+.pref{font-size:14px;color:var(--ink-2);margin:-8px 0 14px}
+.pref a{color:var(--forest);font-weight:700}
 .day.full{opacity:.6}
 @media (max-width:900px){.batches .wrap{grid-template-columns:1fr;gap:20px}}
 @media (max-width:640px){.days{grid-template-columns:1fr}}
@@ -297,8 +309,8 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
   <!-- BATCHES -->
   <div class="batches" aria-labelledby="batchTitle">
     <div class="wrap">
-      <div><h2 id="batchTitle">Next batches</h2><p id="boardNote">Each dot is one order slot.</p></div>
-      <div class="days" id="days" aria-live="polite"></div>
+      <div><h2 id="batchTitle">Next batches</h2><p id="boardNote">Tap a batch to see what's left in it.</p></div>
+      <div class="days" id="days" aria-live="polite" role="group" aria-label="Choose a batch"></div>
     </div>
   </div>
 
@@ -332,8 +344,8 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
     <div class="wrap">
       <div class="sec-head rv"><div><h2 id="howTitle">How pre-orders work</h2><p class="lead">We only make what's ordered, so every tub and bottle is fresh.</p></div></div>
       <ol class="steps">
-        <li class="rv"><h3>Pre-order online</h3><p>Choose your flavors and sizes, then pickup or delivery. You get a queue number and an order code right away.</p></li>
-        <li class="rv d-1"><h3>We culture your batch</h3><p>Batches are made every Monday, Wednesday and Friday. After production we assign your order to a batch, and you can check it with your code.</p></li>
+        <li class="rv"><h3>Pre-order online</h3><p>Pick your flavors and the batch you'd like, then pickup or delivery. You get a queue number and an order code right away.</p></li>
+        <li class="rv d-1"><h3>We confirm your batch</h3><p>Batches are made every Monday, Wednesday and Friday. We check what's left and confirm your batch and date. Track it anytime with your code.</p></li>
         <li class="rv d-2"><h3>Pickup or delivery</h3><p>We'll let you know when it's ready. Delivery adds ₱20, and pickup is free.</p></li>
       </ol>
     </div>
@@ -344,7 +356,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
     <div class="ph"><img src="img/flatlay.jpg" alt="Culture Co. milk drink bottles and yogurt cups in plain, strawberry and blueberry"></div>
     <div class="txt rv">
       <h2>Plain, strawberry and blueberry.</h2>
-      <p>Every flavor comes as a 500g tub, a 100g cup and a 200ml drink. Mix any three cups or any three drinks for ₱100.</p>
+      <p>500g tubs come plain, strawberry or blueberry. Drinks and minis come in sets of 3 for ₱100, and you can mix any flavors in a set.</p>
       <div class="care"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 2v20M4.5 6.5l15 11M19.5 6.5l-15 11"/></svg>Keep refrigerated. Do not freeze.</div>
       <a class="btn" href="#menu" style="align-self:flex-start">See the menu</a>
     </div>
@@ -375,6 +387,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
         </div>
         <div class="panel summary">
           <h3>Summary</h3>
+          <p class="pref">Preferred batch: <b id="prefBatch">—</b> · <a href="#days">change</a></p>
           <div id="lines"></div>
           <button class="btn" id="submit" style="width:100%;margin-top:22px" disabled>Send pre-order</button>
           <div class="err" id="oErr" role="alert"></div>
@@ -450,43 +463,44 @@ const SITE = {
   facebookLink: "https://www.facebook.com/kristy.delapena.1",        // e.g. "https://facebook.com/yourpage"
   instagramLink: "",       // e.g. "https://instagram.com/yourhandle"
 
+  // Phone alerts: install the free "ntfy" app and subscribe to this topic name.
+  // Keep it private. Leave it "" to turn alerts off.
+  orderAlertTopic: "cultureco-yl4c1ni80jlc",
+
   faq: [
-    ["When are batches made?", "Every Monday, Wednesday and Friday. Each batch has a limited number of order slots, shown near the top of the page."],
-    ["When will I know my batch?", "We assign orders to a batch after production. Check anytime with your order code in Track your order."],
+    ["When are batches made?", "Every Monday, Wednesday and Friday. Each batch has a limited number of tubs, bottles and cups, shown near the top of the page."],
+    ["When will I know my batch?", "After you order, we confirm your batch and your pickup or delivery date. Check anytime with your order code in Track your order."],
     ["How much is delivery?", "Delivery adds ₱20 to your order. Pickup is free."],
-    ["Can I mix flavors for the 3-for-₱100 deal?", "Yes. Any three 100g cups count, and any three 200ml drinks count. Cups and drinks are counted separately."],
+    ["How do the sets of 3 work?", "Drinks and minis come in sets of 3 for ₱100. Mix any flavors in a set, for example 2 strawberry and 1 blueberry."],
     ["How do I store it?", "Keep refrigerated. Do not freeze."],
-    ["Is everything always available?", "All items are pre-order and subject to availability. If something runs out, we'll message you."]
+    ["What if my batch is full?", "Pick another batch, or send your order anyway and we'll suggest the next batch with room."]
   ]
 };
 
-/* Menu and prices. `photo` is the picture in the img folder; `color` is the flavor dot. */
-const MENU = [
-  { group: "Cultured Yogurt", size: "500g", photo: "img/tubs.jpg", alt: "Stacks of 500g cultured yogurt tubs", items: [
-    { id: "y500-plain", name: "Plain", price: 120, color: "#fbf3dc" },
-    { id: "y500-straw", name: "Strawberry", price: 140, color: "#f5c4c4" },
-    { id: "y500-blue",  name: "Blueberry", price: 140, color: "#e4bfd6" } ]},
-  { group: "Cultured Yogurt", size: "100g", photo: "img/cups.jpg", alt: "100g cultured yogurt cups with Culture Co. lids", bundle: "y100", deal: "3 for ₱100", items: [
-    { id: "y100-plain", name: "Plain", price: 35, color: "#fbf3dc" },
-    { id: "y100-straw", name: "Strawberry", price: 35, color: "#f5c4c4" },
-    { id: "y100-blue",  name: "Blueberry", price: 35, color: "#e4bfd6" } ]},
-  { group: "Cultured Milk Drink", size: "200ml", photo: "img/drinks.jpg", alt: "200ml cultured milk drink bottles", bundle: "d200", deal: "3 for ₱100", items: [
-    { id: "d200-plain", name: "Plain", price: 35, color: "#fbf3dc" },
-    { id: "d200-straw", name: "Strawberry", price: 35, color: "#f5c4c4" },
-    { id: "d200-blue",  name: "Blueberry", price: 35, color: "#e4bfd6" } ]},
-  { group: "Greek Yogurt", size: "350g", photo: "img/greek.jpg", alt: "Thick plain Greek yogurt seen from above", items: [
-    { id: "g350-pure", name: "Pure", price: 140, color: "#fffaf0" } ]}
+/* Photos and flavor colors. The menu, prices and stock come from Desk. */
+const PHOTOS = [
+  [/greek/i, "img/greek.jpg", "Thick plain Greek yogurt seen from above"],
+  [/drink/i, "img/drinks.jpg", "Cultured milk drink bottles"],
+  [/mini|100\s*g/i, "img/cups.jpg", "100g cultured yogurt cups with Culture Co. lids"],
+  [/plain/i, "img/plain.jpg", "Stacked tubs of plain cultured yogurt"],
+  [/flavou?r|strawberry|blueberry/i, "img/flavored.jpg", "Stacked tubs of flavored cultured yogurt"],
+  [/./, "img/tubs.jpg", "Cultured yogurt tubs"]
 ];
-const BUNDLE_PRICE = 100, BUNDLE_SIZE = 3;
-const DELIVERY_FEE = 20;
-
-/* Batches: every Mon / Wed / Fri, 8 slots each.
-   To close a day or mark slots taken, add a Firestore "batches" document
-   with the same `date` (YYYY-MM-DD); its fields win. */
-const BATCH_DAYS = { 1: "Batch 1", 3: "Batch 2", 5: "Batch 3" };
-const DEFAULT_LIMIT = 8;
-const SHOW_BATCHES = 3;
+const FLAVOR_COLORS = { Strawberry: "#f5c4c4", Blueberry: "#e4bfd6", Plain: "#fbf3dc" };
 /* ======================= END OF EDITABLE PART ======================= */
+
+/* Used only until Desk publishes the live menu. */
+const FALLBACK_SHOP = {
+  deliveryFee: 20, flavors: ["Strawberry","Blueberry","Plain"],
+  products: [
+    { name: "Greek Yogurt @ 350g", price: 140, packQty: 1, flavored: false, flavors: [] },
+    { name: "Plain Yogurt @ 500g", price: 120, packQty: 1, flavored: false, flavors: [] },
+    { name: "Flavored Yogurt @ 500g", price: 140, packQty: 1, flavored: true, flavors: ["Strawberry","Blueberry"] },
+    { name: "Yogurt Drink (Mix and Match) @ 200ml", price: 100, packQty: 3, flavored: true, flavors: ["Strawberry","Blueberry","Plain"] },
+    { name: "Yogurt Mini (Mix and Match) @ 100g", price: 100, packQty: 3, flavored: true, flavors: ["Strawberry","Blueberry","Plain"] }
+  ],
+  batches: []
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyBZQ3ZAolbnRa2Azsy9zIPA0MLKZQwfXWQ",
@@ -498,29 +512,40 @@ const firebaseConfig = {
   measurementId: "G-7BWNEGBVGP"
 };
 
-/* ---------- batches ---------- */
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const peso = n => "₱" + Number(n || 0).toLocaleString("en-PH");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-function autoBatches(count = SHOW_BATCHES){
-  const out = [], d = new Date();
-  for (let i = 0; out.length < count && i < 21; i++){
+const fmtDay = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"long" });
+const fmtShort = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"short", month:"short", day:"numeric" });
+const fmtDate = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ month:"long", day:"numeric" });
+const title = n => String(n).replace(/\s*\(.*?\)\s*/g," ").replace(/\s*@.*$/,"").replace(/\s+/g," ").trim();
+const sizeOf = n => (/@\s*(.+)$/.exec(n) || [,""])[1].trim();
+const photoOf = n => PHOTOS.find(([re]) => re.test(n)) || PHOTOS.at(-1);
+const flavColor = f => FLAVOR_COLORS[f] || "#efeee6";
+
+let shop = FALLBACK_SHOP, live = false, selBatch = "", fulfilment = "pickup", store;
+const cart = {};          // key "p<i>" or "p<i>|Flavor" -> pieces (tubs, bottles or cups)
+
+function fallbackBatches(){
+  const out = [], d = new Date(), names = { 1: "Batch 1", 3: "Batch 2", 5: "Batch 3" };
+  for (let i = 0; out.length < 3 && i < 21; i++){
     const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
-    const label = BATCH_DAYS[x.getDay()];
-    if (label) out.push({ id: ymd(x), label, date: ymd(x), limit: DEFAULT_LIMIT, taken: 0, status: "open" });
+    if (names[x.getDay()]) out.push({ date: ymd(x), label: names[x.getDay()], left: {} });
   }
   return out;
 }
-function batchFromDate(date){
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return null;
-  const x = new Date(date + "T00:00");
-  return { id: date, label: BATCH_DAYS[x.getDay()] || "Batch", date, limit: DEFAULT_LIMIT, taken: 0, status: "open" };
+const batches = () => (live ? (shop.batches || []) : fallbackBatches()).filter(b => b.date >= ymd(new Date()));
+const batchOf = d => batches().find(b => b.date === d) || null;
+const isSet = p => (p.packQty || 1) > 1;
+function leftFor(p){            // pieces left in the chosen batch, or Infinity if Desk isn't limiting it
+  const b = batchOf(selBatch);
+  if (!b || !b.left || typeof b.left[p.name] !== "number") return Infinity;
+  return b.left[p.name];
 }
-function mergeBatches(auto, overrides){
-  const byDate = {};
-  for (const o of overrides) if (o.date) byDate[o.date] = o;
-  const merged = auto.map(b => byDate[b.date] ? { ...b, ...byDate[b.date] } : b);
-  for (const o of overrides) if (!auto.some(b => b.date === o.date)) merged.push({ limit: DEFAULT_LIMIT, taken: 0, status: "open", ...o });
-  return merged.filter(b => b.status !== "hidden").sort((a,b) => a.date.localeCompare(b.date));
-}
+const usedOf = i => Object.keys(cart).filter(k => k === "p"+i || k.startsWith("p"+i+"|")).reduce((a,k) => a + cart[k], 0);
 
 /* ---------- data ---------- */
 function makeCode(){
@@ -534,16 +559,7 @@ async function firebaseStore(){
   const fs = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
   const db = fs.getFirestore(initializeApp(firebaseConfig));
   return {
-    async listBatches(){
-      const auto = autoBatches();
-      const last = auto.length ? auto.at(-1).date : ymd(new Date());
-      let overrides = [];
-      try {
-        const q = fs.query(fs.collection(db,"batches"), fs.where("date",">=",ymd(new Date())), fs.where("date","<=",last));
-        overrides = (await fs.getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
-      } catch(e){ console.warn("Batch overrides unavailable, showing the default schedule", e); }
-      return mergeBatches(auto, overrides);
-    },
+    watchShop(cb){ return fs.onSnapshot(fs.doc(db,"public","shop"), s => cb(s.exists() ? s.data() : null), () => cb(null)); },
     async createOrder(data){
       const id = makeCode();
       const qRef = fs.doc(db,"meta","queue"), oRef = fs.doc(db,"orders",id);
@@ -556,20 +572,9 @@ async function firebaseStore(){
       });
       return { id, queueNumber };
     },
-    async getOrder(id){ const s = await fs.getDoc(fs.doc(db,"orders",id)); return s.exists() ? s.data() : null; },
-    async getBatch(id){
-      try { const s = await fs.getDoc(fs.doc(db,"batches",id)); if (s.exists()) return { id, ...s.data() }; } catch {}
-      return batchFromDate(id);
-    }
+    async getOrder(id){ const s = await fs.getDoc(fs.doc(db,"orders",id)); return s.exists() ? s.data() : null; }
   };
 }
-
-/* ---------- helpers ---------- */
-const $ = id => document.getElementById(id);
-const peso = n => "₱" + n.toLocaleString("en-PH");
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const cart = {}; let fulfilment = "pickup"; let store;
 
 /* ---------- content ---------- */
 function renderContent(){
@@ -586,71 +591,112 @@ function renderContent(){
   if (SITE.messengerLink) $("askWrap").innerHTML = `<p class="lead" style="margin:16px 0 22px">Still have a question? Send us a message.</p><a class="btn" href="${esc(SITE.messengerLink)}" target="_blank" rel="noopener">Message us on Messenger</a>`;
 }
 
+/* ---------- batches ---------- */
+function renderBatches(){
+  const list = batches().slice(0, 3);
+  if (!list.length){ $("days").innerHTML = `<p class="empty">New batches will be posted soon.</p>`; return; }
+  if (!list.some(b => b.date === selBatch)) selBatch = (list.find(b => Object.values(b.left || {}).some(v => v > 0) || !Object.keys(b.left || {}).length) || list[0]).date;
+  $("days").innerHTML = list.map(b => {
+    const rows = shop.products.filter(p => b.left && typeof b.left[p.name] === "number");
+    const total = rows.reduce((a,p) => a + b.left[p.name], 0);
+    const full = rows.length && total <= 0;
+    return `<button type="button" class="day ${full ? "full" : ""}" data-date="${b.date}" aria-pressed="${b.date === selBatch}">
+      <div class="meta"><div class="dn">${fmtDay(b.date)}</div><div class="dd">${fmtDate(b.date)}</div>
+      <div class="left">${!rows.length ? "Open for pre-orders" : full ? "Sold out" : rows.map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name]}</b></span>`).join("")}</div></div>
+    </button>`;
+  }).join("");
+  $("boardNote").textContent = "Tap a batch to see what's left in it. We confirm your batch and date after you order.";
+  $("prefBatch").textContent = selBatch ? `${fmtShort(selBatch)} (${(batchOf(selBatch) || {}).label || "Batch"})` : "—";
+}
+$("days").addEventListener("click", e => {
+  const b = e.target.closest("button[data-date]"); if (!b) return;
+  selBatch = b.dataset.date;
+  // trim the cart to what's left in this batch
+  shop.products.forEach((p, i) => { let over = usedOf(i) - leftFor(p); if (over > 0) for (const k of Object.keys(cart).filter(k => k === "p"+i || k.startsWith("p"+i+"|")).reverse()){ const t = Math.min(cart[k], over); cart[k] -= t; over -= t; } });
+  renderBatches(); renderMenu(); update();
+});
+
+/* ---------- menu ---------- */
+function stepper(key, label, val, canAdd){
+  return `<div class="step">
+    <button type="button" data-k="${esc(key)}" data-d="-1" aria-label="Remove one ${esc(label)}" ${val ? "" : "disabled"}>−</button>
+    <output>${val}</output>
+    <button type="button" class="add" data-k="${esc(key)}" data-d="1" aria-label="Add one ${esc(label)}" ${canAdd ? "" : "disabled"}>+</button>
+  </div>`;
+}
 function renderMenu(){
-  $("menuList").innerHTML = MENU.map((g, gi) => `
-    <article class="prod rv ${gi % 2 ? "d-1" : ""}">
-      <div class="ph"><img src="${esc(g.photo)}" alt="${esc(g.alt || g.group)}" loading="lazy">${g.deal ? `<span class="deal">${esc(g.deal)}, mix flavors</span>` : ""}</div>
+  $("menuList").innerHTML = shop.products.map((p, i) => {
+    const [, src, alt] = photoOf(p.name), left = leftFor(p), used = usedOf(i), canAdd = used < Math.min(left, 60);
+    const unit = isSet(p) ? (/drink/i.test(p.name) ? "bottles" : "cups") : "tubs";
+    const stock = left === Infinity ? "" : left <= 0 ? `<span class="soldout">Sold out for ${esc(fmtShort(selBatch))}</span>` : `<span class="leftn">${left - used} ${unit} left for ${esc(fmtShort(selBatch))}</span>`;
+    let rows;
+    if (p.flavored && p.flavors.length){
+      rows = p.flavors.map(f => `<div class="flv"><span class="sw" style="background:${flavColor(f)}"></span><span class="fn">${esc(f)}</span>${isSet(p) ? "" : `<span class="fp">${peso(p.price)}</span>`}${stepper(`p${i}|${f}`, `${title(p.name)} ${f}`, cart[`p${i}|${f}`] || 0, canAdd)}</div>`).join("");
+    } else {
+      rows = `<div class="flv"><span class="fn">${isSet(p) ? "Pieces" : "Quantity"}</span><span class="fp">${peso(p.price)}</span>${stepper(`p${i}`, title(p.name), cart[`p${i}`] || 0, canAdd)}</div>`;
+    }
+    const setNote = isSet(p) ? (() => { const r = used % p.packQty; return r ? `<p class="setnote">Add ${p.packQty - r} more to finish a set of ${p.packQty}.</p>` : used ? `<p class="setnote ok">${used / p.packQty} set${used / p.packQty === 1 ? "" : "s"} of ${p.packQty}, ${peso(used / p.packQty * p.price)}</p>` : ""; })() : "";
+    return `<article class="prod rv ${i % 2 ? "d-1" : ""} in">
+      <div class="ph"><img src="${src}" alt="${esc(alt)}" loading="lazy">${isSet(p) ? `<span class="deal">${p.packQty} for ${peso(p.price)}, mix flavors</span>` : ""}</div>
       <div class="body">
-        <div class="top"><h3>${esc(g.group)}</h3><span class="size">${esc(g.size)}</span></div>
-        <div class="flavors">
-          ${g.items.map(i => `
-            <div class="flv">
-              <span class="sw" style="background:${i.color}"></span>
-              <span class="fn">${esc(i.name)}</span>
-              <span class="fp">${peso(i.price)}</span>
-              <div class="step">
-                <button type="button" data-id="${i.id}" data-d="-1" aria-label="Remove one ${esc(g.group)} ${esc(g.size)} ${esc(i.name)}">−</button>
-                <output id="q-${i.id}">${cart[i.id] || 0}</output>
-                <button type="button" class="add" data-id="${i.id}" data-d="1" aria-label="Add one ${esc(g.group)} ${esc(g.size)} ${esc(i.name)}">+</button>
-              </div>
-            </div>`).join("")}
-        </div>
+        <div class="top"><h3>${esc(title(p.name))}</h3><span class="size">${esc(sizeOf(p.name))}</span></div>
+        ${stock}
+        <div class="flavors">${rows}</div>
+        ${setNote}
       </div>
-    </article>`).join("");
-  observeReveals();
+    </article>`;
+  }).join("");
 }
 $("menuList").addEventListener("click", e => {
-  const b = e.target.closest("button[data-id]"); if (!b) return;
-  const id = b.dataset.id, d = +b.dataset.d;
-  cart[id] = Math.max(0, Math.min(20, (cart[id]||0) + d));
-  $("q-"+id).textContent = cart[id];
+  const b = e.target.closest("button[data-k]"); if (!b || b.disabled) return;
+  const k = b.dataset.k, d = +b.dataset.d;
+  cart[k] = Math.max(0, (cart[k] || 0) + d);
   if (d > 0) bump();
-  update();
+  const y = scrollY; renderMenu(); update(); scrollTo(0, y);
+  const again = document.querySelector(`button[data-k="${CSS.escape(k)}"][data-d="${d}"]`);
+  if (again && !again.disabled) again.focus(); else document.querySelector(`button[data-k="${CSS.escape(k)}"]`)?.focus();
 });
-function bump(){
-  for (const el of [$("cartN")]) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
-}
+function bump(){ const el = $("cartN"); el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
 
+/* ---------- cart ---------- */
 function calc(){
-  const items = []; let subtotal = 0; const bundles = {};
-  for (const g of MENU) for (const i of g.items){
-    const q = cart[i.id] || 0; if (!q) continue;
-    items.push({ id: i.id, name: `${g.group} ${g.size} – ${i.name}`, qty: q, price: i.price });
-    if (g.bundle) bundles[g.bundle] = { q: (bundles[g.bundle]?.q || 0) + q, unit: i.price };
-    else subtotal += q * i.price;
-  }
-  let savings = 0;
-  for (const k in bundles){
-    const { q, unit } = bundles[k];
-    const cost = Math.floor(q/BUNDLE_SIZE)*BUNDLE_PRICE + (q%BUNDLE_SIZE)*unit;
-    savings += q*unit - cost; subtotal += cost;
-  }
-  const fee = fulfilment === "delivery" && items.length ? DELIVERY_FEE : 0;
-  return { items, subtotal, savings, fee, total: subtotal + fee, count: items.reduce((a,b)=>a+b.qty,0) };
+  const items = [], problems = []; let subtotal = 0, pieces = 0;
+  shop.products.forEach((p, i) => {
+    const used = usedOf(i); if (!used) return;
+    pieces += used;
+    if (isSet(p)){
+      if (used % p.packQty) problems.push(`${title(p.name)}: add ${p.packQty - used % p.packQty} more to finish a set of ${p.packQty}.`);
+      const sets = Math.floor(used / p.packQty);
+      if (sets){
+        const flavors = {}; p.flavors.forEach(f => { if (cart[`p${i}|${f}`]) flavors[f] = cart[`p${i}|${f}`]; });
+        const it = { product: p.name, qty: sets, price: p.price, pack: p.packQty };
+        if (Object.keys(flavors).length) it.flavors = flavors;
+        items.push(it); subtotal += sets * p.price;
+      }
+    } else if (p.flavored && p.flavors.length){
+      p.flavors.forEach(f => { const q = cart[`p${i}|${f}`]; if (q){ items.push({ product: p.name, qty: q, price: p.price, flavors: { [f]: q } }); subtotal += q * p.price; } });
+    } else {
+      items.push({ product: p.name, qty: used, price: p.price }); subtotal += used * p.price;
+    }
+    const left = leftFor(p); if (used > left) problems.push(`${title(p.name)}: only ${left} left for ${fmtShort(selBatch)}.`);
+  });
+  const fee = fulfilment === "delivery" && items.length ? Number(shop.deliveryFee ?? 20) : 0;
+  return { items, problems, subtotal, fee, total: subtotal + fee, pieces };
 }
+const lineText = it => `${it.pack ? `${it.qty} set${it.qty === 1 ? "" : "s"} of ${it.pack}` : `${it.qty}×`} ${title(it.product)} ${sizeOf(it.product)}${it.flavors ? ` (${Object.entries(it.flavors).map(([f,n]) => n > 1 ? `${f} ×${n}` : f).join(", ")})` : ""}`;
 let orderInView = false;
 function update(){
   const c = calc();
-  $("count").textContent = `${c.count} item${c.count===1?"":"s"}`;
+  $("count").textContent = `${c.pieces} item${c.pieces === 1 ? "" : "s"}`;
   $("sum").textContent = peso(c.total);
-  $("cartN").textContent = c.count; $("cartN").classList.toggle("on", c.count > 0);
-  $("bar").classList.toggle("show", c.count > 0 && !orderInView);
-  $("submit").disabled = !c.count;
-  $("lines").innerHTML = c.count ? `
-    ${c.items.map(i => `<div class="row"><span>${i.qty}× ${esc(i.name)}</span><span>${peso(i.qty*i.price)}</span></div>`).join("")}
-    ${c.savings ? `<div class="row"><span>3-for-₱100 savings</span><span>−${peso(c.savings)}</span></div>` : ""}
+  $("cartN").textContent = c.pieces; $("cartN").classList.toggle("on", c.pieces > 0);
+  $("bar").classList.toggle("show", c.pieces > 0 && !orderInView);
+  $("submit").disabled = !c.items.length || c.problems.length > 0;
+  $("lines").innerHTML = c.pieces ? `
+    ${c.items.map(i => `<div class="row"><span>${esc(lineText(i))}</span><span>${peso(i.qty * i.price)}</span></div>`).join("")}
     ${c.fee ? `<div class="row"><span>Delivery</span><span>${peso(c.fee)}</span></div>` : ""}
-    <div class="row total"><span>Total</span><span>${peso(c.total)}</span></div>`
+    <div class="row total"><span>Total</span><span>${peso(c.total)}</span></div>
+    ${c.problems.map(p => `<p class="err" style="min-height:0">${esc(p)}</p>`).join("")}`
     : `<p class="empty">No items yet. Add some from the <a href="#menu">menu</a>.</p>`;
 }
 new IntersectionObserver(es => { orderInView = es[0].isIntersecting; update(); }, { threshold: .1 }).observe($("order"));
@@ -665,44 +711,26 @@ function setFulfilment(v){
 $("fPick").onclick = () => setFulfilment("pickup");
 $("fDel").onclick = () => setFulfilment("delivery");
 
-/* ---------- batches ---------- */
-const fmtDay = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"long" });
-const fmtDate = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ month:"long", day:"numeric" });
-async function renderBatches(){
-  try {
-    const list = (await store.listBatches()).slice(0,3);
-    if (!list.length){ $("days").innerHTML = `<p class="empty">New batches will be posted soon.</p>`; return; }
-    let k = 0;
-    $("days").innerHTML = list.map(b => {
-      const limit = Math.max(0, Number(b.limit) || 0), taken = Math.min(limit, Math.max(0, Number(b.taken) || 0));
-      const closed = b.status === "closed", left = closed ? 0 : limit - taken;
-      const dots = Array.from({ length: Math.min(limit, 12) }, (_, i) => `<i class="${closed || i >= left ? "taken" : ""}" style="animation-delay:${(k++)*40}ms"></i>`).join("");
-      return `<div class="day ${left ? "" : "full"}">
-        <div class="meta"><div class="dn">${fmtDay(b.date)}</div><div class="dd">${fmtDate(b.date)}</div>
-        <div class="left">${closed ? "Closed" : left ? `${left} of ${limit} slots open` : "Full"}</div></div>
-        <div class="dots" aria-hidden="true">${dots}</div>
-      </div>`;
-    }).join("");
-  } catch(e){
-    $("days").innerHTML = `<p class="empty">Batch slots couldn't load. Refresh to try again.</p>`;
-  }
-}
-
 /* ---------- send order ---------- */
 $("submit").onclick = async () => {
   const c = calc(), name = $("name").value.trim(), phone = $("phone").value.trim(), addr = $("addr").value.trim();
   $("oErr").textContent = "";
+  if (c.problems.length){ $("oErr").textContent = c.problems[0]; return; }
   if (!name || !phone){ $("oErr").textContent = "Add your name and a way to reach you."; ($("name").value.trim() ? $("phone") : $("name")).focus(); return; }
   if (fulfilment === "delivery" && !addr){ $("oErr").textContent = "Add your delivery address."; $("addr").focus(); return; }
   if (!store){ $("oErr").textContent = "Still connecting. Wait a moment and send it again."; return; }
   $("submit").disabled = true; $("submit").textContent = "Sending…";
   try {
     const r = await store.createOrder({ name, contact: phone, fulfilment, address: fulfilment === "delivery" ? addr : "",
-      notes: $("notes").value.trim(), items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total });
+      notes: $("notes").value.trim(), items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total,
+      preferredBatch: selBatch || null });
+    if (SITE.orderAlertTopic) fetch("https://ntfy.sh/" + encodeURIComponent(SITE.orderAlertTopic), { method: "POST",
+      headers: { "Title": `New pre-order #${r.queueNumber}`, "Tags": "bell", "Click": location.origin + location.pathname.replace(/[^/]*$/, "") + "desk.html#reserve" },
+      body: `${name.split(" ")[0]} · ${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)} · ${fulfilment === "delivery" ? "Delivery" : "Pickup"}` }).catch(() => {});
     $("dQueue").textContent = "#" + r.queueNumber; $("dCode").textContent = r.id; $("code").value = r.id;
     try { localStorage.setItem("cc_last", r.id); } catch {}
     $("orderGrid").classList.add("hide"); $("done").classList.remove("hide");
-    for (const k in cart) cart[k] = 0; renderMenu(); update();
+    for (const k in cart) delete cart[k]; renderMenu(); update();
     $("done").scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
   } catch(e){
     console.error(e);
@@ -713,8 +741,8 @@ $("submit").onclick = async () => {
 $("again").onclick = () => { $("done").classList.add("hide"); $("orderGrid").classList.remove("hide"); location.hash = "#menu"; };
 
 /* ---------- track ---------- */
-const STEPS = ["pending","assigned","ready","completed"];
-const STATUS = { pending:"Pre-order received", assigned:"Assigned to a batch", ready:"Ready for pickup or out for delivery", completed:"Completed", cancelled:"Cancelled" };
+const STEPS = ["pending","approved","ready","completed"];
+const STATUS = { pending:"Waiting for confirmation", approved:"Confirmed", assigned:"Confirmed", ready:"Ready for pickup or out for delivery", completed:"Completed", cancelled:"Not confirmed" };
 $("trackForm").onsubmit = async e => {
   e.preventDefault();
   const code = $("code").value.trim().toUpperCase(); $("tErr").textContent = ""; $("tResult").innerHTML = "";
@@ -723,14 +751,17 @@ $("trackForm").onsubmit = async e => {
   try {
     const o = await store.getOrder(code);
     if (!o){ $("tErr").textContent = `No order matches ${code}. Check the code and try again.`; return; }
-    const b = o.batchId ? await store.getBatch(o.batchId) : null;
-    const at = STEPS.indexOf(o.status);
+    const st = o.status === "assigned" ? "approved" : o.status, at = STEPS.indexOf(st), del = o.fulfilment === "delivery";
+    const info = st === "pending"
+      ? `<p>We'll confirm your batch and ${del ? "delivery" : "pickup"} date soon.${o.preferredBatch ? ` You asked for ${esc(fmtShort(o.preferredBatch))}.` : ""}</p>`
+      : st === "cancelled" ? `<p>We couldn't fit this order in. ${SITE.messengerLink ? `<a href="${esc(SITE.messengerLink)}" target="_blank" rel="noopener">Message us</a> to pick another batch.` : ""}</p>`
+      : `<p><b>Batch:</b> ${o.batchId ? `${esc(o.batchLabel || "Batch")}, ${esc(fmtShort(o.batchId))}` : "To be confirmed"}<br><b>${del ? "Delivery" : "Pickup"} date:</b> ${o.date ? esc(fmtDay(o.date) + ", " + fmtDate(o.date)) : "To be confirmed"}</p>`;
     $("tResult").innerHTML = `<div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><h3>${esc(STATUS[o.status] || o.status)}</h3><b>#${o.queueNumber}</b></div>
-      ${o.status === "cancelled" ? "" : `<div class="status" aria-hidden="true">${STEPS.map((_,i) => `<i class="${i <= at ? "on" : ""}"></i>`).join("")}</div>`}
-      <p><b>Batch:</b> ${b ? `${fmtDay(b.date)}, ${fmtDate(b.date)}` : "We'll assign it after production"}</p>
+      ${st === "cancelled" ? "" : `<div class="status" aria-hidden="true">${STEPS.map((_,i) => `<i class="${i <= at ? "on" : ""}"></i>`).join("")}</div>`}
+      ${info}
       <div class="summary" style="margin-top:12px;position:static">
-        ${(o.items||[]).map(i => `<div class="row"><span>${i.qty}× ${esc(i.name)}</span></div>`).join("")}
+        ${(o.items||[]).map(i => `<div class="row"><span>${esc(i.product ? lineText(i) : `${i.qty}× ${i.name}`)}</span></div>`).join("")}
         ${o.deliveryFee ? `<div class="row"><span>Delivery</span><span>${peso(o.deliveryFee)}</span></div>` : ""}
         <div class="row total"><span>Total</span><span>${peso(o.total)}</span></div>
       </div></div>`;
@@ -755,10 +786,15 @@ function onScroll(){
 addEventListener("scroll", onScroll, { passive: true });
 
 /* ---------- start ---------- */
-renderContent(); renderMenu(); update(); onScroll(); observeReveals();
+renderContent(); renderBatches(); renderMenu(); update(); onScroll(); observeReveals();
 try { const last = localStorage.getItem("cc_last"); if (last) $("code").value = last; } catch {}
-try { store = await firebaseStore(); renderBatches(); }
-catch(e){ console.error(e); $("days").innerHTML = `<p class="empty">Couldn't connect. Refresh to try again.</p>`; }
+try {
+  store = await firebaseStore();
+  store.watchShop(data => {
+    if (data && Array.isArray(data.products) && data.products.length){ shop = data; live = true; }
+    renderBatches(); renderMenu(); update();
+  });
+} catch(e){ console.error(e); }
 </script>
 </body>
 </html>
