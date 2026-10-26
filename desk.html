@@ -559,6 +559,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 
     <div class="card">
       <h2>Batches left</h2>
+      <div id="carryBox" style="display:flex;flex-direction:column;gap:10px"></div>
       <p class="muted small" id="capNote"></p>
       <div class="form"><div class="field"><label for="capGreek">Greek tubs you make per batch</label><input id="capGreek" type="number" min="1" step="1" inputmode="numeric"></div></div>
       <div style="display:flex;flex-direction:column;gap:6px"><span class="lbl">Batches you make each week</span>
@@ -1675,6 +1676,54 @@ function capFor(date){var v=S.capacity.byDate[date];return typeof v==='number'?v
 function usedOn(bdate){return sum(mem.reservations.filter(function(r){return bdate&&batchDateOf(r)===bdate&&r.status!=='cancelled';}),function(r){return batchesFor(r.product,piecesOf(r),bdate);});}
 function greekOn(bdate){return sum(mem.reservations.filter(function(r){return bdate&&batchDateOf(r)===bdate&&r.status!=='cancelled'&&GREEK.test(r.product);}),function(r){return r.qty;});}
 function shortName(n){return String(n).replace(/\s*\(.*?\)\s*/g,' ').replace(/\s*@.*$/,'').replace(/\s+/g,' ').trim();}
+/* ---------- leftover Greek tubs roll into the next batch ---------- */
+function greekMade(k){
+  var b=mem.batches.filter(function(x){return ymd(new Date(x.startAt))===k&&x.packed!=null;})[0];
+  return b?{n:b.packed,real:true}:{n:tubsFor(k),real:false};
+}
+function greekSold(k,next){
+  var pre=pcsOn(k,'Greek');
+  var walk=sum(mem.orders.filter(function(o){return !o.fee&&!o.fromReservation&&GREEK.test(o.product)&&o.date>=k&&(!next||o.date<next);}),piecesOf);
+  return pre+walk;
+}
+function carryList(){
+  if(!S.carried||typeof S.carried!=='object')S.carried={};
+  var out=[],today=ymd(new Date()),d0=new Date(),past=[];
+  for(var i=14;i>=0;i--){var k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-i));if(capFor(k)>0||mem.batches.some(function(x){return x.packed!=null&&ymd(new Date(x.startAt))===k;}))past.push(k);}
+  var ahead=batchDates().filter(function(k){return k>today;});
+  past.forEach(function(k,ix){
+    if(S.carried[k])return;
+    var nextAny=past[ix+1]||ahead[0]||null,to=ahead.find(function(x){return x>k;});
+    if(!to)return;
+    var m=greekMade(k),sold=greekSold(k,nextAny),left=m.n-sold;
+    if(left>0&&m.real)out.push({k:k,to:to,made:m.n,real:m.real,sold:sold,left:left});
+  });
+  return out;
+}
+function renderCarry(){
+  var el=$('carryBox');if(!el||!greekProd())return;
+  var list=carryList(),done=Object.keys(S.carried||{}).filter(function(k){return S.carried[k]&&S.carried[k].n>0&&S.carried[k].to>=ymd(new Date());});
+  el.innerHTML=list.map(function(c){
+    return '<div class="nextstart"><div class="t"><strong>'+c.left+' Greek tub'+(c.left===1?'':'s')+' left from '+esc((batchName(c.k)||'Batch')+' · '+dateLabel(c.k))+'</strong>'
+      +'<span class="muted small">'+(c.real?'Made':'Planned')+' '+c.made+', sold '+c.sold+'. Add '+(c.left===1?'it':'them')+' to '+esc((batchName(c.to)||'the next batch')+' · '+dateLabel(c.to))+'?</span></div>'
+      +'<div class="actions"><button type="button" class="btn small" data-act="carrygo" data-k="'+c.k+'">Add '+c.left+' to '+esc(batchName(c.to)||'next batch')+'</button><button type="button" class="btn small quiet" data-act="carryskip" data-k="'+c.k+'">Not needed</button></div></div>';
+  }).join('')+done.map(function(k){var c=S.carried[k];
+    return '<p class="muted small">'+c.n+' leftover Greek tub'+(c.n===1?'':'s')+' from '+esc((batchName(k)||'Batch')+' · '+dateLabel(k))+' added to '+esc((batchName(c.to)||'Batch')+' · '+dateLabel(c.to))+'. <button type="button" class="btn small quiet" style="min-height:28px;padding:2px 10px" data-act="carryundo" data-k="'+k+'">Undo</button></p>';
+  }).join('');
+}
+function carryGo(k){
+  var c=carryList().find(function(x){return x.k===k;});if(!c)return;
+  S.capacity.tubs[c.to]=tubsFor(c.to)+c.left;
+  S.carried[k]={to:c.to,n:c.left,at:Date.now()};
+  saveSettings();renderAll();
+  toast('Added '+c.left+' Greek tub'+(c.left===1?'':'s')+' to '+(batchName(c.to)||'the next batch')+'.');
+}
+function carrySkip(k){if(!S.carried)S.carried={};S.carried[k]={n:0,skip:true,at:Date.now()};saveSettings();renderAll();}
+function carryUndo(k){
+  var c=S.carried&&S.carried[k];if(!c)return;
+  if(c.n>0&&c.to){var v=tubsFor(c.to)-c.n,base=baseTubs(parseYmd(c.to).getDay());if(v===base)delete S.capacity.tubs[c.to];else S.capacity.tubs[c.to]=Math.max(1,v);}
+  delete S.carried[k];saveSettings();renderAll();toast('Undone.');
+}
 function greekProd(){return S.products.find(function(p){return GREEK.test(p.name);})||null;}
 function prodKey(name){if(GREEK.test(name)){var g=greekProd();return g?g.name:name;}var p=prodInfo(name);return p?p.name:name;}
 function unitOf(p){return GREEK.test(p.name)||!(p.packQty>1)?'tubs':'pcs';}
@@ -1821,6 +1870,7 @@ function renderReserve(){
     $('resList').innerHTML=carHtml('res',slides,'batch');
     carInit('res');
   }
+  renderCarry();
   $('capNote').textContent='Set which weekdays you make a batch, then how many of each product are available in each batch. Leave a product blank if you do not want to limit it. Pre-orders assigned to a batch are counted against what is available. If a single batch comes out different, open it in the list below and change its numbers. Only pre-orders count here.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el&&document.activeElement!==el)el.value=S.capacity.weekly[d];});
   var tw=$('capTubsWeek');
@@ -2097,6 +2147,9 @@ document.addEventListener('click',function(e){
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
+  else if(a==='carrygo')carryGo(t.dataset.k);
+  else if(a==='carryskip')carrySkip(t.dataset.k);
+  else if(a==='carryundo')carryUndo(t.dataset.k);
   else if(a==='carprev')carGo(t.dataset.car,carIdx(t.dataset.car)-1);
   else if(a==='carnext')carGo(t.dataset.car,carIdx(t.dataset.car)+1);
   else if(a==='cardot')carGo(t.dataset.car,Number(t.dataset.i));
