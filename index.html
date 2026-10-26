@@ -474,7 +474,7 @@ const SITE = {
   ],
   marquee: ["Naturally cultured", "Naturally good", "Made Mon, Wed and Fri", "Plain, strawberry and blueberry", "Pre-order your slot"],
 
-  messengerLink: "https://m.me/kristy.delapena.1",       // e.g. "https://m.me/yourpage"  (adds a Message us link)
+  messengerLink: "https://m.me/7631346350237664",       // opens a chat with Culture Co. in the Messenger app (phone) or messenger.com (computer)
   facebookLink: "https://www.facebook.com/kristy.delapena.1",        // e.g. "https://facebook.com/yourpage"
   instagramLink: "",       // e.g. "https://instagram.com/yourhandle"
 
@@ -764,10 +764,10 @@ function renderTrack(code, o){
   const st = o.status === "assigned" ? "approved" : o.status, at = STEPS.indexOf(st), del = o.fulfilment === "delivery";
   const info = st === "pending"
     ? `<p>We'll confirm your batch and ${del ? "delivery" : "pickup"} date soon. This page updates by itself when we do.${o.preferredBatch ? ` You asked for ${esc(fmtShort(o.preferredBatch))}.` : ""}</p>`
-    : st === "cancelled" ? `<p>We couldn't fit this order in. ${SITE.messengerLink ? `<a href="${esc(SITE.messengerLink)}" target="_blank" rel="noopener">Message us</a> to pick another batch.` : ""}</p>`
-    : `<p><b>Batch:</b> ${o.batchId ? `${esc(o.batchLabel || "Batch")}, ${esc(fmtShort(o.batchId))}` : "To be confirmed"}<br><b>${del ? "Delivery" : "Pickup"} date:</b> ${o.date ? esc(fmtDay(o.date) + ", " + fmtDate(o.date)) : "To be confirmed"}</p>`;
+    : st === "cancelled" ? `<p>${o.wasApproved ? "Sorry, we had to cancel this order." : "We couldn't fit this order in."} ${SITE.messengerLink ? `<a href="${esc(SITE.messengerLink)}" target="_blank" rel="noopener">Message us</a> to pick another batch.` : ""}</p>`
+    : `${o.rescheduledAt && st === "approved" ? `<p><b>Your order was moved to a new batch.</b> The new dates are below.</p>` : ""}<p><b>Batch:</b> ${o.batchId ? `${esc(o.batchLabel || "Batch")}, ${esc(fmtShort(o.batchId))}` : "To be confirmed"}<br><b>${del ? "Delivery" : "Pickup"} date:</b> ${o.date ? esc(fmtDay(o.date) + ", " + fmtDate(o.date)) : "To be confirmed"}</p>`;
   $("tResult").innerHTML = `<div class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><h3>${esc(STATUS[o.status] || o.status)}</h3><b>#${o.queueNumber}</b></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px"><h3>${esc(st === "cancelled" && o.wasApproved ? "Cancelled" : st === "approved" && o.rescheduledAt ? "Confirmed, new date" : (STATUS[o.status] || o.status))}</h3><b>#${o.queueNumber}</b></div>
     ${st === "cancelled" ? "" : `<div class="status" aria-hidden="true">${STEPS.map((_,i) => `<i class="${i <= at ? "on" : ""}"></i>`).join("")}</div>`}
     ${info}
     <div class="summary" style="margin-top:12px;position:static">
@@ -781,9 +781,11 @@ function bannerFor(o){
   const st = o.status === "assigned" ? "approved" : o.status, del = o.fulfilment === "delivery";
   const when = o.date ? `${del ? "delivery" : "pickup"} ${fmtShort(o.date)}` : o.batchId ? fmtShort(o.batchId) : "";
   const txt = st === "pending" ? `Order <b>#${o.queueNumber}</b> sent. Waiting for confirmation.`
+    : st === "approved" && o.rescheduledAt ? `Order <b>#${o.queueNumber}</b> was moved${when ? ` to ${esc(when)}` : ""}.`
     : st === "approved" ? `Order <b>#${o.queueNumber}</b> is confirmed${when ? `: ${esc(when)}` : ""}.`
     : st === "ready" ? `Order <b>#${o.queueNumber}</b> is ready${del ? " and on its way" : " for pickup"}.`
     : st === "completed" ? `Order <b>#${o.queueNumber}</b> is completed. Thank you!`
+    : o.wasApproved ? `Order <b>#${o.queueNumber}</b> was cancelled. Tap View for details.`
     : `Order <b>#${o.queueNumber}</b> couldn't be confirmed. Tap View for details.`;
   let seen = ""; try { seen = localStorage.getItem("cc_seen") || ""; } catch {}
   const key = `${o.queueNumber}:${st}:${o.date || ""}`;

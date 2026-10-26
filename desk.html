@@ -5,6 +5,9 @@
 <link rel="icon" href="img/mark.png">
 <link rel="manifest" href="desk.webmanifest">
 <link rel="apple-touch-icon" href="img/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Desk">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -296,7 +299,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <p class="eyebrow" id="todayLabel"></p>
       <h1>Culture Co. Desk</h1>
     </div>
-    <div class="who" id="who" hidden><span class="muted small" id="whoEmail"></span><button type="button" class="btn small quiet" id="signOut">Sign out</button></div>
+    <div class="who" id="who" hidden><span class="muted small" id="whoEmail"></span><button type="button" class="btn small quiet" id="alertsBtn" hidden>Turn on alerts</button><button type="button" class="btn small quiet" id="installBtn" hidden>Install app</button><button type="button" class="btn small quiet" id="signOut">Sign out</button></div>
   </header>
 
   <div class="strip">
@@ -1684,7 +1687,7 @@ function rEntries(list){
   out.forEach(function(g){g.lines.sort(function(a,b){return (a.created||0)-(b.created||0);});});
   return out;
 }
-var resAdd=null,raConfirm=false;
+var resAdd=null,raConfirm=false,resMove=null,resMoveSel={},resCancelArm={};
 function addFormHtml(key){
   return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Add an item to this pre-order</span><div class="form">'
     +'<div class="field wide"><label for="raP">Product</label><input id="raP" data-combo="products" maxlength="60" placeholder="Greek Yogurt @ 350g"></div>'
@@ -1705,9 +1708,11 @@ function resRow(g){
   }else{
     pill=r.date<today?'<span class="pill bad">Late</span>':r.date===today?'<span class="pill warn">Due today</span>':'';
     chk='<button type="button" class="check" aria-pressed="false" aria-label="Mark as ordered: '+esc(r.customer)+'" data-act="rconvert" data-id="'+esc(key)+'"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>';
-    btns='<button type="button" class="btn small quiet" data-act="rdeliv" data-id="'+esc(key)+'">'+(g.lines.some(function(l){return l.delivery;})?'Make pickup':'Make delivery')+'</button><button type="button" class="btn small quiet" data-act="rcpt-res" data-id="'+esc(key)+'">Copy message</button><button type="button" class="btn small quiet" data-act="rcancel" data-id="'+esc(key)+'">Cancel</button><button type="button" class="btn small danger" data-del="resgroup:'+esc(key)+'">Delete</button>';
+    btns='<button type="button" class="btn small quiet" data-act="rdeliv" data-id="'+esc(key)+'">'+(g.lines.some(function(l){return l.delivery;})?'Make pickup':'Make delivery')+'</button><button type="button" class="btn small quiet" data-act="rcpt-res" data-id="'+esc(key)+'">Copy message</button><button type="button" class="btn small quiet" data-act="rmoveopen" data-id="'+esc(key)+'">Reschedule</button><button type="button" class="btn small '+(resCancelArm[key]?'danger':'quiet')+'" data-act="rcancel" data-id="'+esc(key)+'">'+(resCancelArm[key]?'Tap again to cancel':'Cancel order')+'</button><button type="button" class="btn small danger" data-del="resgroup:'+esc(key)+'">Delete</button>';
   }
-  var pick=r.status==='reserved'?'<label class="small muted" style="display:flex;align-items:center;gap:6px;margin-top:4px" for="rb-'+esc(key)+'">Batch <select id="rb-'+esc(key)+'" data-act="rbatch" data-id="'+esc(key)+'" style="min-height:34px;padding:4px 6px;width:auto;max-width:100%">'+batchOpts(bd)+'</select></label>':'';
+  var pick=r.status==='reserved'&&resMove===key?moveFormHtml(g,bd)
+    :r.status==='reserved'&&bd?'<span class="small muted" style="margin-top:4px">'+batchDot(batchName(bd))+'Made in '+esc((batchName(bd)||'Batch')+' · '+dateLabel(bd))+'</span>'
+    :r.status==='reserved'?'<label class="small muted" style="display:flex;align-items:center;gap:6px;margin-top:4px" for="rb-'+esc(key)+'">Batch <select id="rb-'+esc(key)+'" data-act="rbatch" data-id="'+esc(key)+'" style="min-height:34px;padding:4px 6px;width:auto;max-width:100%">'+batchOpts(bd)+'</select></label>':'';
   var body=nl>1?'<div class="olines">'+items.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(l.product)+' × '+qtyText(l)+' at '+money(l.price)+flavHtml(l)+'</span><span>'+money(l.qty*l.price)+(r.status==='reserved'?' <button type="button" class="btn small quiet" style="min-height:28px;padding:2px 8px" data-act="rlrm" data-lid="'+l.id+'" aria-label="Remove '+esc(l.product)+'">Remove</button>':'')+'</span></div>';}).join('')+'</div>':'<span class="muted small">'+prodDot(r.product)+esc(r.product)+' × '+qtyText(r)+' at '+money(r.price)+flavHtml(r)+'</span>';
   body+=feeRow(feeL);
   var addBtn=r.status==='reserved'?(resAdd===key?addFormHtml(key):'<div><button type="button" class="btn small quiet" style="margin-top:4px" data-act="raddopen" data-id="'+esc(key)+'">+ Add item</button></div>'):'';
@@ -1830,6 +1835,59 @@ function setResBatch(key,v){
   var chain=Promise.resolve();
   rLines(key).forEach(function(l){chain=chain.then(function(){return put('reservations',Object.assign({},l,{batchDate:v||null}),true);});});
   chain.then(function(){renderAll();});
+}
+/* ---------- cancel or reschedule an approved pre-order, then tell the customer ---------- */
+function resNoteO(lines){
+  var r=lines[0],note=String(r.note||''),m=note.match(/Online #(\d+)/),web=!!r.webId;
+  return {id:r.webId||null,name:r.customer,queueNumber:m?m[1]:'',contact:web?note.split(' · ')[0]:'',
+    total:sum(lines,function(l){return l.qty*l.price;}),fulfilment:lines.some(function(l){return l.delivery;})?'delivery':'pickup'};
+}
+function moveSel(key,bd,date){
+  var s=resMoveSel[key];
+  if(!s){s=resMoveSel[key]={b:bd||'',d:date||''};}
+  return s;
+}
+function moveFormHtml(g,bd){
+  var key=g.key,lines=g.lines.filter(function(l){return l.status==='reserved';}),r=lines[0]||g.lines[0],s=moveSel(key,bd,r.date),del=lines.some(function(l){return l.delivery;});
+  var items=lines.filter(notFee),add={};
+  if(s.b&&s.b!==bd)items.forEach(function(l){var k=prodKey(l.product);add[k]=(add[k]||0)+piecesOf(l);});
+  var rows=s.b?stockRows(s.b,add).filter(function(x){return x.add>0;}):[],over=rows.filter(function(x){return x.left<0;});
+  var chk=!s.b?'':s.b===bd?'<p class="muted small">Same batch. Only the date changes.</p>'
+    :rows.length?'<p class="small'+(over.length?' left0':' muted')+'">'+(over.length?'Over stock: ':'After moving: ')+rows.map(function(x){return esc(shortName(x.p.name))+' '+(x.left<0?'over by '+(-x.left):x.left+' left');}).join(' · ')+'</p>':'';
+  var same=s.b===(bd||'')&&s.d===r.date;
+  return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Move to another batch</span><div class="form">'
+    +'<div class="field"><label for="mvb-'+esc(key)+'">New batch</label><select id="mvb-'+esc(key)+'" data-mvb="'+esc(key)+'">'+batchOpts(s.b)+'</select></div>'
+    +'<div class="field"><label for="mvd-'+esc(key)+'">New '+(del?'delivery':'pickup')+' date</label><input type="date" id="mvd-'+esc(key)+'" data-mvd="'+esc(key)+'" value="'+esc(s.d)+'"></div></div>'
+    +chk
+    +'<div class="actions"><button type="button" class="btn small" data-act="rmovego" data-id="'+esc(key)+'"'+(same?' disabled':'')+'>Move and notify customer</button><button type="button" class="btn small quiet" data-act="rmoveclose">Close</button></div></div>';
+}
+function moveRes(key){
+  var lines=rLines(key).filter(function(x){return x.status==='reserved';});if(!lines.length)return;
+  var s=resMoveSel[key]||{},r=lines[0],from=batchDateOf(r);
+  if(!s.b){toast('Pick the new batch.');return;}
+  if(!s.d){toast('Pick the new pickup or delivery date.');return;}
+  if(s.b===(from||'')&&s.d===r.date){toast('Nothing changed.');return;}
+  var o=resNoteO(lines);
+  lines.forEach(function(l){put('reservations',Object.assign({},l,{batchDate:s.b,date:s.d}),true);});
+  webSync(key,{batchId:s.b,batchLabel:batchName(s.b)||'Batch',date:s.d,rescheduledAt:Date.now()});
+  resMove=null;delete resMoveSel[key];
+  addCustNote({o:o,kind:'rescheduled',b:s.b,d:s.d});
+  renderAll();toast('Moved to '+(batchName(s.b)||'the new batch')+'. Now let '+(o.name||'them')+' know.');
+}
+function cancelRes(key){
+  if(!resCancelArm[key]){
+    resCancelArm[key]=1;renderReserve();
+    setTimeout(function(){if(resCancelArm[key]){delete resCancelArm[key];renderReserve();}},4000);
+    return;
+  }
+  delete resCancelArm[key];
+  var lines=rLines(key).filter(function(x){return x.status==='reserved';});if(!lines.length)return;
+  var o=resNoteO(lines),r=lines[0];
+  webSync(key,{status:'cancelled',wasApproved:true,cancelledAt:Date.now()});
+  setResStatus(key,'cancelled');
+  if(resMove===key)resMove=null;
+  addCustNote({o:o,kind:'cancelled',b:batchDateOf(r),d:r.date});
+  toast('Order cancelled. Now let '+(o.name||'them')+' know.');
 }
 function delResGroup(key){
   var chain=Promise.resolve();
@@ -1957,7 +2015,10 @@ document.addEventListener('click',function(e){
   else if(a==='exp-res')exportReservations();
   else if(a==='rconvert')convertRes(id);
   else if(a==='rundo')undoRes(id);
-  else if(a==='rcancel')setResStatus(id,'cancelled');
+  else if(a==='rcancel')cancelRes(id);
+  else if(a==='rmoveopen'){resMove=resMove===id?null:id;delete resMoveSel[id];renderReserve();}
+  else if(a==='rmoveclose'){if(resMove)delete resMoveSel[resMove];resMove=null;renderReserve();}
+  else if(a==='rmovego')moveRes(id);
   else if(a==='rreopen')setResStatus(id,'reserved');
   else if(a==='resfilter'){resFilter=t.dataset.f;renderReserve();}
   else if(a==='prodadd'){S.products.push({name:'New product',kg:0.5,price:0,packQty:1,sugarG:0,jamG:0,pack:0,color:S.products.length%8});saveSettings();renderAll();}
@@ -1992,6 +2053,11 @@ document.addEventListener('change',function(e){
   if(t.dataset&&t.dataset.act==='steptime'){var bt=mem.batches.find(function(x){return x.id===t.dataset.id;});if(bt){var ii=Number(t.dataset.i),v=new Date(t.value).getTime(),at=Object.assign({},bt.at||{});if(t.value===''||!isFinite(v))delete at[ii];else at[ii]=v;t.blur();put('batches',Object.assign({},bt,{at:at}));toast(t.value?'Straining time saved.':'Time cleared.');}return;}
   if(t.dataset&&t.dataset.act==='strained'){var bs=mem.batches.find(function(x){return x.id===t.dataset.id;});if(bs){var sv=num(t.value);put('batches',Object.assign({},bs,{strained:t.value===''||!(sv>=0)?null:Math.round(sv*100)/100}));}return;}
   if(t.dataset&&t.dataset.act==='packed'){var b=mem.batches.find(function(x){return x.id===t.dataset.id;});if(b)put('batches',Object.assign({},b,{packed:t.value===''?null:Math.max(0,Math.round(num(t.value)))}));}
+  else if(t.dataset&&(t.dataset.mvb||t.dataset.mvd)){
+    var mk=t.dataset.mvb||t.dataset.mvd,ms=resMoveSel[mk]||(resMoveSel[mk]={b:'',d:''});
+    if(t.dataset.mvb){ms.b=t.value;if(t.value)ms.d=nextPackDay(t.value);}else ms.d=t.value;
+    t.blur();renderReserve();
+  }
   else if(t.dataset&&t.dataset.act==='rbatch'){
     setResBatch(t.dataset.id,t.value);
   }
@@ -2197,7 +2263,67 @@ $('expForm').addEventListener('submit',function(e){
   $('eNote').value='';$('eAmt').value='';toast('Expense added');
 });
 
-setInterval(function(){renderStrip();renderBanners();if(activeTab==='production')renderProduction();},30000);
+setInterval(function(){renderStrip();renderBanners();if(activeTab==='production')renderProduction();remindCheck();},30000);
+
+/* ---------- phone notifications (new orders + production reminders) ---------- */
+function deskNotify(title,body,tag){
+  try{
+    if(!window.Notification||Notification.permission!=='granted')return;
+    var opt={body:body,icon:'img/icon-192.png',badge:'img/icon-192.png',tag:tag||undefined,data:{url:'desk.html#reserve'}};
+    if(navigator.serviceWorker&&navigator.serviceWorker.ready){
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if(reg&&reg.showNotification)return reg.showNotification(title,opt);
+        new Notification(title,opt);
+      }).catch(function(){});
+    }else new Notification(title,opt);
+  }catch(e){}
+}
+var REM_LS='cc-desk-reminded';
+function remindCheck(){
+  if(!window.Notification||Notification.permission!=='granted')return;
+  var seen={};try{seen=JSON.parse(localStorage.getItem(REM_LS)||'{}')||{};}catch(e){}
+  var now=Date.now(),changed=false;
+  dueSteps().forEach(function(x){
+    var k=x.b.id+':'+x.s.i+':'+x.s.label;
+    if(seen[k]||now-x.s.start>6*3600000)return;
+    seen[k]=now;changed=true;
+    deskNotify((x.b.name||'Batch')+': '+x.s.label,'Time for this step. Open Desk to tick it off.','step-'+x.b.id+'-'+x.s.i);
+  });
+  var st=startReminder();
+  if(st&&st.due&&!seen['start:'+st.day]&&now-st.at<6*3600000){seen['start:'+st.day]=now;changed=true;deskNotify('Time to start '+(st.name||'today\'s batch'),'Open Desk to start the batch.','start-'+st.day);}
+  if(changed){Object.keys(seen).forEach(function(k){if(now-seen[k]>14*86400000)delete seen[k];});try{localStorage.setItem(REM_LS,JSON.stringify(seen));}catch(e){}}
+}
+function renderAlertsBtn(){
+  var b=$('alertsBtn');if(!b)return;
+  if(!window.Notification){b.hidden=true;return;}
+  var p=Notification.permission;
+  b.hidden=p==='granted';
+  b.textContent=p==='denied'?'Alerts blocked':'Turn on alerts';
+}
+$('alertsBtn').addEventListener('click',function(){
+  if(!window.Notification)return;
+  if(Notification.permission==='denied'){toast('Alerts are blocked. Allow notifications for this site in your browser settings.');return;}
+  Notification.requestPermission().then(function(p){
+    renderAlertsBtn();
+    if(p==='granted'){deskNotify('Alerts are on','You\'ll get new online orders and batch reminders here.','alerts-on');remindCheck();}
+  });
+});
+
+/* ---------- install as an app ---------- */
+var installEvt=null,isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+var standalone=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;
+function renderInstallBtn(){var b=$('installBtn');if(b)b.hidden=standalone||!(installEvt||isIOS);}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;renderInstallBtn();});
+window.addEventListener('appinstalled',function(){installEvt=null;standalone=true;renderInstallBtn();toast('Desk is installed. Open it from your home screen.');});
+$('installBtn').addEventListener('click',function(){
+  if(installEvt){installEvt.prompt();installEvt.userChoice.then(function(){installEvt=null;renderInstallBtn();});return;}
+  if(isIOS)toast('In Safari, tap Share, then Add to Home Screen.');
+});
+if('serviceWorker' in navigator&&/^https:|^http:\/\/localhost/.test(location.href)){
+  window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
+}
+window.addEventListener('online',function(){toast('Back online. Syncing your changes.');});
+window.addEventListener('offline',function(){toast('Offline. Changes are saved and will sync later.');});
 
 /* ---------- website link (online orders + shop menu and stock) ---------- */
 var web=null,webOrders=[],webFirst=true,webPub='',webPubTimer=null,webDecline={},webSel={};
@@ -2205,20 +2331,35 @@ var WEB_STATUS_NOTE='Online',webNotes=[];
 function webSiteUrl(){return location.origin+location.pathname.replace(/[^/]*$/,'');}
 function longDate(d){return parseYmd(d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
 function webMsg(n){
-  var o=n.o,first=String(o.name||'').trim().split(/\s+/)[0]||'there';
-  if(n.kind==='declined')return 'Hi '+first+', sorry, we couldn\'t fit your Culture Co. pre-order #'+o.queueNumber+' into our next batches. Reply here and we\'ll find another batch for you. Thank you!';
-  return 'Hi '+first+'! Your Culture Co. pre-order #'+o.queueNumber+' is confirmed.\n'
+  var o=n.o,first=String(o.name||'').trim().split(/\s+/)[0]||'there',no=o.queueNumber?' #'+o.queueNumber:'',del=o.fulfilment==='delivery';
+  var track=o.id?'\nTrack it anytime: '+webSiteUrl()+'#track (code '+o.id+')':'';
+  if(n.kind==='declined')return 'Hi '+first+', sorry, we couldn\'t fit your Culture Co. pre-order'+no+' into our next batches. Reply here and we\'ll find another batch for you. Thank you!';
+  if(n.kind==='cancelled')return 'Hi '+first+', we\'re sorry, but we had to cancel your Culture Co. pre-order'+no
+    +(n.b?' for '+(batchName(n.b)||'the batch')+' ('+longDate(n.b)+')':'')+'.\n'
+    +'If you already paid, we\'ll refund you in full. Reply here if you\'d like us to book you into another batch.\nSorry for the trouble, and thank you!';
+  if(n.kind==='rescheduled')return 'Hi '+first+'! A quick update on your Culture Co. pre-order'+no+'. We moved it to a new batch:\n'
     +(batchName(n.b)||'Batch')+' ('+longDate(n.b)+')\n'
-    +(o.fulfilment==='delivery'?'Delivery':'Pickup')+': '+longDate(n.d)+'\n'
-    +'Total: '+money(o.total)+'\n'
-    +'Track it anytime: '+webSiteUrl()+'#track (code '+o.id+')\nThank you!';
+    +'New '+(del?'delivery':'pickup')+' date: '+longDate(n.d)+'\n'
+    +'Total stays '+money(o.total)+'.'+track+'\nIf the new date doesn\'t work for you, just reply here. Thank you!';
+  return 'Hi '+first+'! Your Culture Co. pre-order'+no+' is confirmed.\n'
+    +(batchName(n.b)||'Batch')+' ('+longDate(n.b)+')\n'
+    +(del?'Delivery':'Pickup')+': '+longDate(n.d)+'\n'
+    +'Total: '+money(o.total)
+    +track+'\nThank you!';
+}
+var NOTE_LS='cc-desk-notes',NOTE_LABEL={approved:'Approved',declined:'Declined',cancelled:'Cancelled',rescheduled:'Moved'};
+function saveCustNotes(){try{localStorage.setItem(NOTE_LS,JSON.stringify(webNotes.slice(0,30)));}catch(e){}}
+function loadCustNotes(){try{var v=JSON.parse(localStorage.getItem(NOTE_LS)||'[]');if(Array.isArray(v))webNotes=v.filter(function(n){return n&&n.o&&n.kind;});}catch(e){}}
+function addCustNote(n){
+  n.at=Date.now();webNotes.unshift(n);saveCustNotes();renderWebNotes();
+  var el=$('webNotes');if(el&&el.firstElementChild){try{el.firstElementChild.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}}
 }
 function webPhone(c){var d=String(c||'').replace(/[^\d+]/g,'');return d.replace(/\D/g,'').length>=10?d:'';}
 function renderWebNotes(){
   var el=$('webNotes');if(!el)return;
   el.innerHTML=webNotes.map(function(n,i){
     var ph=webPhone(n.o.contact),msg=webMsg(n);
-    return '<div class="nextstart'+(n.kind==='declined'?' due':'')+'"><div class="t"><strong>Let '+esc(n.o.name)+' know</strong><span class="muted small">'+(n.kind==='declined'?'Declined':'Approved')+' #'+esc(n.o.queueNumber)+' · '+esc(n.o.contact)+'</span><span class="small" style="white-space:pre-line;margin-top:6px">'+esc(msg)+'</span></div>'
+    return '<div class="nextstart'+(n.kind==='declined'||n.kind==='cancelled'?' due':'')+'"><div class="t"><strong>Let '+esc(n.o.name)+' know</strong><span class="muted small">'+(NOTE_LABEL[n.kind]||'Update')+(n.o.queueNumber?' #'+esc(n.o.queueNumber):'')+(n.o.contact?' · '+esc(n.o.contact):'')+'</span><span class="small" style="white-space:pre-line;margin-top:6px">'+esc(msg)+'</span></div>'
       +'<div class="actions">'+(ph?'<a class="btn small" href="sms:'+esc(ph)+'?&body='+encodeURIComponent(msg)+'">Text message</a>':'')
       +'<button type="button" class="btn small '+(ph?'quiet':'')+'" data-act="webcopy" data-i="'+i+'">Copy for Messenger</button>'
       +'<button type="button" class="btn small quiet" data-act="webdone" data-i="'+i+'">Done</button></div></div>';
@@ -2261,7 +2402,7 @@ function webListen(){
       webBeep();
       var o=webOrders.find(function(x){return x.id===fresh[0];});
       toast('New online pre-order'+(o?' from '+o.name:''));
-      try{if(window.Notification&&Notification.permission==='granted'&&o)new Notification('New online pre-order #'+o.queueNumber,{body:o.name+' · '+money(o.total),icon:'img/mark.png'});}catch(e){}
+      if(o)deskNotify('New online pre-order #'+o.queueNumber,o.name+' · '+money(o.total),'web-'+o.id);
     }
   },function(e){$('webList').innerHTML=emptyBox('Online orders could not load ('+esc(e.code||'error')+'). Check that you are signed in with the shop account.');});
 }
@@ -2319,13 +2460,13 @@ function approveWeb(id){
   });
   if(del&&o.deliveryFee>0)chain=chain.then(function(){return put('reservations',{id:uid(),group:g,date:f.d,batchDate:f.b,customer:o.name,product:'Delivery fee',qty:1,price:num(o.deliveryFee),fee:true,delivery:true,note:note,status:'reserved',created:base+lines.length,webId:o.id},true);});
   chain.then(function(){return web.fs.collection('orders').doc(id).update({status:'approved',batchId:f.b,date:f.d,batchLabel:batchName(f.b)||'Batch',deskGroup:g});})
-    .then(function(){delete webSel[id];webNotes.unshift({o:Object.assign({id:id},o),kind:'approved',b:f.b,d:f.d});renderWebNotes();renderAll();toast('Approved #'+o.queueNumber+'. Now let them know.');})
+    .then(function(){delete webSel[id];addCustNote({o:Object.assign({id:id},o),kind:'approved',b:f.b,d:f.d});renderAll();toast('Approved #'+o.queueNumber+'. Now let them know.');})
     .catch(function(){toast('Could not approve. Check your connection and try again.');});
 }
 function declineWeb(id){
   if(!webDecline[id]){webDecline[id]=1;renderWeb();setTimeout(function(){delete webDecline[id];renderWeb();},4000);return;}
   delete webDecline[id];
-  var od=webOrders.find(function(x){return x.id===id;});web.fs.collection('orders').doc(id).update({status:'cancelled'}).then(function(){if(od){webNotes.unshift({o:Object.assign({id:id},od),kind:'declined'});renderWebNotes();}toast('Order declined. Let them know.');}).catch(function(){toast('Could not decline. Try again.');});
+  var od=webOrders.find(function(x){return x.id===id;});web.fs.collection('orders').doc(id).update({status:'cancelled'}).then(function(){if(od){addCustNote({o:Object.assign({id:id},od),kind:'declined'});}toast('Order declined. Let them know.');}).catch(function(){toast('Could not decline. Try again.');});
 }
 function webSync(key,fields){
   if(!web)return;
@@ -2334,7 +2475,7 @@ function webSync(key,fields){
 }
 document.addEventListener('click',function(e){
   var nb=e.target.closest&&e.target.closest('[data-act="webcopy"],[data-act="webdone"]');
-  if(nb){var n=webNotes[Number(nb.dataset.i)];if(!n)return;if(nb.dataset.act==='webcopy')copyText(webMsg(n),'Message copied. Paste it in Messenger.');else{webNotes.splice(Number(nb.dataset.i),1);renderWebNotes();}return;}
+  if(nb){var n=webNotes[Number(nb.dataset.i)];if(!n)return;if(nb.dataset.act==='webcopy')copyText(webMsg(n),'Message copied. Paste it in Messenger.');else{webNotes.splice(Number(nb.dataset.i),1);saveCustNotes();renderWebNotes();}return;}
   var b=e.target.closest&&e.target.closest('[data-act="webok"],[data-act="webno"]');if(!b)return;
   if(b.dataset.act==='webok')approveWeb(b.dataset.id);else declineWeb(b.dataset.id);
 });
@@ -2356,6 +2497,7 @@ document.addEventListener('change',function(e){
 })();
 window.deskConnect=function(adapter,fs){
   web={fs:fs};
+  loadCustNotes();renderWebNotes();renderAlertsBtn();renderInstallBtn();
   connectDb(adapter);
   webListen();
   renderAll();
@@ -2426,7 +2568,7 @@ show(TABS.indexOf(location.hash.slice(1))>=0?location.hash.slice(1):'production'
       doc:function(p){var a=p.split('/');return base.collection(a[0]).doc(a[1]);}
     };
     window.deskConnect(adapter,fs);
-    try{if(window.Notification&&Notification.permission==='default')document.addEventListener('click',function ask(){Notification.requestPermission();document.removeEventListener('click',ask);},{once:true});}catch(e){}
+    
   });
 })();
 </script>
