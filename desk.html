@@ -299,7 +299,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <p class="eyebrow" id="todayLabel"></p>
       <h1>Culture Co. Desk</h1>
     </div>
-    <div class="who" id="who" hidden><span class="muted small" id="whoEmail"></span><button type="button" class="btn small quiet" id="alertsBtn" hidden>Turn on alerts</button><button type="button" class="btn small quiet" id="installBtn" hidden>Install app</button><button type="button" class="btn small quiet" id="signOut">Sign out</button></div>
+    <div class="who" id="who" hidden><span class="muted small" id="whoEmail"></span><button type="button" class="btn small quiet" id="alertsBtn" hidden>Turn on alerts</button><button type="button" class="btn small quiet" id="installBtn" hidden>Install app</button><button type="button" class="btn small quiet" id="refreshBtn" aria-label="Refresh Desk">Refresh</button><button type="button" class="btn small quiet" id="signOut">Sign out</button></div>
   </header>
 
   <div class="strip">
@@ -2322,6 +2322,35 @@ $('installBtn').addEventListener('click',function(){
 if('serviceWorker' in navigator&&/^https:|^http:\/\/localhost/.test(location.href)){
   window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
 }
+/* ---------- refresh (button + pull down from the top in the installed app) ---------- */
+function deskRefresh(){
+  var b=$('refreshBtn');if(b){b.disabled=true;b.textContent='Refreshing…';}
+  if(!navigator.onLine){toast('Offline. Showing your saved data. It syncs when you are back online.');if(b){b.disabled=false;b.textContent='Refresh';}return;}
+  var go=function(){location.reload();};
+  try{
+    if(navigator.serviceWorker){navigator.serviceWorker.getRegistration().then(function(r){return r&&r.update();}).catch(function(){}).then(go);setTimeout(go,2500);return;}
+  }catch(e){}
+  go();
+}
+$('refreshBtn').addEventListener('click',deskRefresh);
+(function(){
+  if(!standalone)return;
+  var y0=null,pulled=0,ind=document.createElement('div');
+  ind.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:9999;transform:translate(-50%,-60px);transition:transform .15s;background:#1F4D3A;color:#fff;font:600 14px/1 system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none';
+  ind.textContent='Pull to refresh';document.body.appendChild(ind);
+  addEventListener('touchstart',function(e){y0=(window.scrollY<=0&&e.touches.length===1)?e.touches[0].clientY:null;pulled=0;},{passive:true});
+  addEventListener('touchmove',function(e){
+    if(y0==null)return;pulled=e.touches[0].clientY-y0;
+    if(pulled<=0||window.scrollY>0){ind.style.transform='translate(-50%,-60px)';return;}
+    ind.textContent=pulled>90?'Release to refresh':'Pull to refresh';
+    ind.style.transform='translate(-50%,'+Math.min(pulled*0.5,40)+'px)';
+  },{passive:true});
+  addEventListener('touchend',function(){
+    if(y0!=null&&pulled>90&&window.scrollY<=0){ind.textContent='Refreshing…';deskRefresh();}
+    else ind.style.transform='translate(-50%,-60px)';
+    y0=null;pulled=0;
+  });
+})();
 window.addEventListener('online',function(){toast('Back online. Syncing your changes.');});
 window.addEventListener('offline',function(){toast('Offline. Changes are saved and will sync later.');});
 

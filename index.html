@@ -224,6 +224,13 @@ input:focus,textarea:focus{outline:none;border-color:var(--forest)}
 .empty{color:var(--ink-2);font-size:15px}
 .err{color:#a52a4a;font-size:14px;font-weight:700;min-height:1.4em;margin-top:10px}
 .note{font-size:14px;color:var(--ink-2);margin-top:12px}
+.confirm{max-width:640px;margin:0 auto}
+.cfgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+.cfgrid div{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+.cfl{font-size:13px;color:var(--ink-2);font-weight:600}
+.cfbtns{display:flex;gap:10px;margin-top:22px}
+.cfbtns .btn{flex:1;justify-content:center}
+@media (max-width:520px){.cfgrid{grid-template-columns:1fr}.cfbtns{flex-direction:column-reverse}}
 .done{text-align:center;padding:56px 28px;max-width:640px;margin:0 auto}
 .done img{width:72px;margin:0 auto 12px;animation:float 4s ease-in-out infinite}
 .done .q{font-family:var(--serif);font-size:110px;line-height:1;color:var(--forest);margin:6px 0}
@@ -297,7 +304,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
     <nav aria-label="Main">
       <a href="#menu">Menu</a><a href="#story">Our story</a><a href="#how">How it works</a><a href="#track">Track order</a><a href="#faq">FAQ</a>
     </nav>
-    <a class="btn small cartbtn" href="#order" id="cartBtn">Pre-order<span class="n" id="cartN">0</span></a>
+    <a class="btn small cartbtn" href="#menu" id="cartBtn">Pre-order<span class="n" id="cartN">0</span></a>
   </div>
 </header>
 
@@ -386,8 +393,11 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
           <h3>Your details</h3>
           <label for="name">Name</label>
           <input id="name" autocomplete="name" maxlength="80">
-          <label for="phone">Mobile number or Messenger name</label>
-          <input id="phone" maxlength="80">
+          <label for="phone">Mobile number</label>
+          <input id="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="0917 123 4567" aria-describedby="phoneHelp">
+          <p class="note" id="phoneHelp" style="margin-top:6px">We'll text or call this number to confirm your batch.</p>
+          <label for="fb">Messenger name (optional)</label>
+          <input id="fb" maxlength="80" placeholder="Name on Facebook">
           <label id="fLabel">Pickup or delivery</label>
           <div class="seg" role="group" aria-labelledby="fLabel">
             <button type="button" id="fPick" aria-pressed="true">Pickup</button>
@@ -404,10 +414,29 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
           <h3>Summary</h3>
           <p class="pref">Preferred batch: <b id="prefBatch">—</b> · <a href="#days">change</a></p>
           <div id="lines"></div>
-          <button class="btn" id="submit" style="width:100%;margin-top:22px" disabled>Send pre-order</button>
+          <button class="btn" id="submit" style="width:100%;margin-top:22px" disabled>Continue</button>
           <div class="err" id="oErr" role="alert"></div>
           <p class="note">All items are pre-order and subject to availability.</p>
         </div>
+      </div>
+      <div class="panel confirm hide" id="confirm" aria-labelledby="cfTitle">
+        <h3 id="cfTitle">Confirm your pre-order</h3>
+        <p class="note" style="margin:6px 0 18px">Check everything below, then confirm to send it to us.</p>
+        <div class="cfgrid">
+          <div><span class="cfl">Name</span><b id="cfName"></b></div>
+          <div><span class="cfl">Mobile number</span><b id="cfPhone"></b></div>
+          <div id="cfFbWrap"><span class="cfl">Messenger</span><b id="cfFb"></b></div>
+          <div><span class="cfl" id="cfModeL">Pickup</span><b id="cfMode"></b></div>
+          <div><span class="cfl">Preferred batch</span><b id="cfBatch"></b></div>
+          <div id="cfNotesWrap"><span class="cfl">Notes</span><b id="cfNotes"></b></div>
+        </div>
+        <div class="summary" id="cfLines" style="position:static;margin-top:18px"></div>
+        <div class="cfbtns">
+          <button type="button" class="btn line" id="cfBack">Edit details</button>
+          <button type="button" class="btn" id="cfGo">Confirm pre-order</button>
+        </div>
+        <div class="err" id="cfErr" role="alert"></div>
+        <p class="note">All items are pre-order and subject to availability. We'll confirm your batch and date.</p>
       </div>
       <div class="panel done hide" id="done" aria-live="polite">
         <img src="img/mark.png" alt="">
@@ -450,7 +479,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
 <footer>
   <div class="wrap">
     <img class="logo" src="img/logo-cream.png" alt="Culture Co. Naturally cultured. Naturally good.">
-    <div class="links" id="footLinks"><a href="#menu">Menu</a><a href="#order">Pre-order</a><a href="#track">Track order</a><a href="#faq">FAQ</a></div>
+    <div class="links" id="footLinks"><a href="#menu">Menu</a><a href="#menu">Pre-order</a><a href="#track">Track order</a><a href="#faq">FAQ</a></div>
     <small>Made every Monday, Wednesday and Friday. Keep refrigerated. Do not freeze.</small>
   </div>
 </footer>
@@ -728,35 +757,72 @@ function setFulfilment(v){
 $("fPick").onclick = () => setFulfilment("pickup");
 $("fDel").onclick = () => setFulfilment("delivery");
 
-/* ---------- send order ---------- */
-$("submit").onclick = async () => {
-  const c = calc(), name = $("name").value.trim(), phone = $("phone").value.trim(), addr = $("addr").value.trim();
+/* ---------- send order: details -> confirm -> send ---------- */
+const phDigits = v => String(v || "").replace(/\D/g, "");
+const phValid = v => /^(09\d{9}|639\d{9})$/.test(phDigits(v));
+const phNice = v => { const d = phDigits(v), l = d.startsWith("63") ? "0" + d.slice(2) : d; return `${l.slice(0,4)} ${l.slice(4,7)} ${l.slice(7)}`; };
+function details(){
+  return { name: $("name").value.trim(), phone: $("phone").value.trim(), fb: $("fb").value.trim(),
+    addr: $("addr").value.trim(), notes: $("notes").value.trim() };
+}
+function showStep(step){
+  $("orderGrid").classList.toggle("hide", step !== "form");
+  $("confirm").classList.toggle("hide", step !== "confirm");
+  $("done").classList.toggle("hide", step !== "done");
+  const el = step === "form" ? $("orderGrid") : $(step);
+  el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+}
+$("phone").addEventListener("input", () => { if ($("oErr").textContent && phValid($("phone").value)) $("oErr").textContent = ""; });
+$("submit").onclick = () => {
+  const c = calc(), d = details();
   $("oErr").textContent = "";
+  if (!c.items.length){ $("oErr").textContent = "Add something from the menu first."; return; }
   if (c.problems.length){ $("oErr").textContent = c.problems[0]; return; }
-  if (!name || !phone){ $("oErr").textContent = "Add your name and a way to reach you."; ($("name").value.trim() ? $("phone") : $("name")).focus(); return; }
-  if (fulfilment === "delivery" && !addr){ $("oErr").textContent = "Add your delivery address."; $("addr").focus(); return; }
-  if (!store){ $("oErr").textContent = "Still connecting. Wait a moment and send it again."; return; }
-  $("submit").disabled = true; $("submit").textContent = "Sending…";
+  if (!d.name){ $("oErr").textContent = "Add your name."; $("name").focus(); return; }
+  if (!d.phone){ $("oErr").textContent = "Add your mobile number so we can confirm your order."; $("phone").focus(); return; }
+  if (!phValid(d.phone)){ $("oErr").textContent = "Check your mobile number. It should look like 0917 123 4567."; $("phone").focus(); return; }
+  if (fulfilment === "delivery" && !d.addr){ $("oErr").textContent = "Add your delivery address."; $("addr").focus(); return; }
+  const del = fulfilment === "delivery";
+  $("cfName").textContent = d.name;
+  $("cfPhone").textContent = phNice(d.phone);
+  $("cfFb").textContent = d.fb; $("cfFbWrap").classList.toggle("hide", !d.fb);
+  $("cfModeL").textContent = del ? "Delivery to" : "Pickup";
+  $("cfMode").textContent = del ? d.addr : "Free pickup";
+  $("cfBatch").textContent = selBatch ? fmtShort(selBatch) : "Next available";
+  $("cfNotes").textContent = d.notes; $("cfNotesWrap").classList.toggle("hide", !d.notes);
+  $("cfLines").innerHTML = c.items.map(i => `<div class="row"><span>${esc(lineText(i))}</span><span>${peso(i.qty * i.price)}</span></div>`).join("")
+    + (c.fee ? `<div class="row"><span>Delivery</span><span>${peso(c.fee)}</span></div>` : "")
+    + `<div class="row total"><span>Total</span><span>${peso(c.total)}</span></div>`;
+  $("cfErr").textContent = "";
+  showStep("confirm");
+};
+$("cfBack").onclick = () => showStep("form");
+$("cfGo").onclick = async () => {
+  const c = calc(), d = details();
+  $("cfErr").textContent = "";
+  if (!c.items.length || c.problems.length || !d.name || !phValid(d.phone)){ showStep("form"); $("submit").click(); return; }
+  if (!store){ $("cfErr").textContent = "Still connecting. Wait a moment and confirm again."; return; }
+  $("cfGo").disabled = true; $("cfBack").disabled = true; $("cfGo").textContent = "Sending…";
   try {
-    const r = await store.createOrder({ name, contact: phone, fulfilment, address: fulfilment === "delivery" ? addr : "",
-      notes: $("notes").value.trim(), items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total,
+    const notes = [d.fb ? `Messenger: ${d.fb}` : "", d.notes].filter(Boolean).join(" · ");
+    const r = await store.createOrder({ name: d.name, contact: phNice(d.phone), fulfilment, address: fulfilment === "delivery" ? d.addr : "",
+      notes, items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total,
       preferredBatch: selBatch || null });
     if (SITE.orderAlertTopic) fetch("https://ntfy.sh/" + encodeURIComponent(SITE.orderAlertTopic), { method: "POST",
       headers: { "Title": `New pre-order #${r.queueNumber}`, "Tags": "bell", "Click": location.origin + location.pathname.replace(/[^/]*$/, "") + "desk.html#reserve" },
-      body: `${name.split(" ")[0]} · ${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)} · ${fulfilment === "delivery" ? "Delivery" : "Pickup"}` }).catch(() => {});
+      body: `${d.name.split(" ")[0]} · ${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)} · ${fulfilment === "delivery" ? "Delivery" : "Pickup"}` }).catch(() => {});
     $("dQueue").textContent = "#" + r.queueNumber; $("dCode").textContent = r.id; $("code").value = r.id;
     try { localStorage.setItem("cc_last", r.id); } catch {}
     watch(r.id, true);
-    $("orderGrid").classList.add("hide"); $("done").classList.remove("hide");
     for (const k in cart) delete cart[k]; renderMenu(); update();
-    $("done").scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    showStep("done");
   } catch(e){
     console.error(e);
-    $("oErr").textContent = "Your pre-order didn't go through. Check your connection and send it again.";
+    $("cfErr").textContent = "Your pre-order didn't go through. Check your connection and confirm again.";
   }
-  $("submit").textContent = "Send pre-order"; update();
+  $("cfGo").disabled = false; $("cfBack").disabled = false; $("cfGo").textContent = "Confirm pre-order";
 };
-$("again").onclick = () => { $("done").classList.add("hide"); $("orderGrid").classList.remove("hide"); location.hash = "#menu"; };
+$("again").onclick = () => { $("done").classList.add("hide"); $("confirm").classList.add("hide"); $("orderGrid").classList.remove("hide"); location.hash = "#menu"; };
 
 /* ---------- track ---------- */
 const STEPS = ["pending","approved","ready","completed"];
