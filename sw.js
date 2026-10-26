@@ -1,6 +1,6 @@
 // Culture Co. Desk service worker: lets Desk open with no signal and shows notifications.
 // When you change desk.html, bump VERSION (v2, v3...) so phones pick up the new copy.
-const VERSION = 'cc-desk-v1';
+const VERSION = 'cc-desk-v2';
 
 const SHELL = [
   'desk.html',
@@ -17,7 +17,7 @@ const SHELL = [
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(VERSION)
-      .then((c) => Promise.allSettled(SHELL.map((u) => c.add(new Request(u, { mode: u.startsWith('http') ? 'no-cors' : 'same-origin' })))))
+      .then((c) => Promise.allSettled(SHELL.map((u) => c.add(new Request(u, { mode: 'cors' })))))
       .then(() => self.skipWaiting())
   );
 });
@@ -49,16 +49,22 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Scripts, fonts, images: saved copy right away, refreshed in the background.
+  // Desk files and the Firebase scripts: saved copy right away, refreshed in the background.
+  // Fonts and other sites are left to the browser, and only small CORS copies are saved
+  // (opaque copies count as several MB each and fill up phone storage).
   const sameOrigin = url.origin === self.location.origin;
-  if (!sameOrigin && !/gstatic\.com|fonts\.googleapis\.com/.test(url.hostname)) return;
+  const firebaseLib = url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/');
+  if (!sameOrigin && !firebaseLib) return;
+  if (sameOrigin && !/\.(png|jpe?g|webp|svg|webmanifest|js)$/.test(url.pathname)) return;
+  const key = firebaseLib ? new Request(req.url, { mode: 'cors' }) : req;
   e.respondWith(
     caches.open(VERSION).then((c) =>
-      c.match(req).then((hit) => {
-        const net = fetch(req)
-          .then((res) => { if (res.ok || res.type === 'opaque') c.put(req, res.clone()); return res; })
-          .catch(() => hit);
-        return hit || net;
+      c.match(key.url).then((hit) => {
+        const net = fetch(key)
+          .then((res) => { if (res.ok && res.type !== 'opaque') c.put(key.url, res.clone()); return res; })
+          .catch(() => hit || Response.error());
+        if (hit) { try { e.waitUntil(net.catch(() => {})); } catch (_) {} return hit; }
+        return net;
       })
     )
   );
