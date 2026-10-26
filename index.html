@@ -280,6 +280,11 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
 /* cart bar */
 .bar{position:fixed;left:12px;right:12px;bottom:14px;z-index:30;max-width:540px;margin:0 auto;background:var(--forest);color:var(--milk);border-radius:999px;padding:8px 8px 8px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 20px 44px -16px rgba(47,70,48,.7);transform:translateY(160%);transition:transform .45s var(--ease)}
 .bar.show{transform:none}
+.menu-next{margin-top:36px;display:flex;align-items:center;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;padding:22px 26px;border-radius:24px;background:var(--milk);border:1px solid var(--sage-2)}
+.menu-next p{margin:0;font-size:16px;color:var(--ink-2)}
+.menu-next p b{color:var(--forest);font-size:18px}
+.menu-next .btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+@media (max-width:520px){.menu-next{padding:20px}.menu-next .btn{width:100%;justify-content:center}}
 .bar .t{flex:1;font-size:15px}
 .bar b{font-size:18px}
 
@@ -345,6 +350,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
         <div><h2 id="menuTitle">The menu</h2><p class="lead">Tap + to add to your pre-order. Everything is made to order and subject to availability.</p></div>
       </div>
       <div class="menu" id="menuList"></div>
+      <div class="menu-next" id="menuNext" aria-live="polite"><p id="mnText">Add items above to start your pre-order.</p><a class="btn" href="#order" id="mnGo" aria-disabled="true">Continue to order form</a></div>
     </div>
   </section>
 
@@ -736,6 +742,8 @@ function update(){
   $("count").textContent = `${c.pieces} item${c.pieces === 1 ? "" : "s"}`;
   $("sum").textContent = peso(c.total);
   $("cartN").textContent = c.pieces; $("cartN").classList.toggle("on", c.pieces > 0);
+  $("mnGo").setAttribute("aria-disabled", c.pieces ? "false" : "true");
+  $("mnText").innerHTML = c.pieces ? `<b>${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)}</b><br>${c.problems.length ? esc(c.problems[0]) : "Next, add your details and confirm."}` : "Add items above to start your pre-order.";
   $("bar").classList.toggle("show", c.pieces > 0 && !orderInView);
   $("submit").disabled = !c.items.length || c.problems.length > 0;
   $("lines").innerHTML = c.pieces ? `
