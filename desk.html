@@ -122,7 +122,11 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .bcar{position:relative}
 .btrack{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 .btrack::-webkit-scrollbar{display:none}
-.btrack>.batch{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
+.btrack>.batch,.btrack>.cslide{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
+.btrack{align-items:flex-start;overflow-y:hidden;transition:height .25s ease}
+.cslide.one{border:1px solid var(--line);border-radius:16px;padding:2px 14px;background:var(--bg)}
+.cslide.one>.list>li{border-bottom:0}
+.cslide>.resgroup{margin-top:0}
 .bnav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 2px}
 .bnav[hidden]{display:none}
 .bnav .arw{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:20px;line-height:1;display:grid;place-items:center;cursor:pointer}
@@ -1023,7 +1027,7 @@ function runIdx(){var t=$('btrack');if(!t||!t.children.length)return 0;var w=t.c
 function runCurId(){return runId;}
 function runSync(){
   var t=$('btrack');if(!t)return;var i=runIdx(),n=t.children.length;
-  var a=t.children[i];if(a&&a.dataset.bid)runId=a.dataset.bid;
+  var a=t.children[i];if(a&&a.dataset.bid)runId=a.dataset.bid;if(a)fitTrack(t,a);
   document.querySelectorAll('.bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
   var p=$('bpos');if(p)p.textContent=(i+1)+' of '+n;
   var nav=$('bnav');if(nav){nav.querySelector('[data-act="bprev"]').disabled=i===0;nav.querySelector('[data-act="bnext"]').disabled=i>=n-1;}
@@ -1035,6 +1039,42 @@ function runGo(i,instant){
   if(instant){t.style.scrollBehavior='auto';t.scrollLeft=x;t.style.scrollBehavior='';}else t.scrollTo({left:x,behavior:'smooth'});
   if(t.children[i].dataset.bid)runId=t.children[i].dataset.bid;
   runSync();
+}
+/* ---------- generic swipe carousel (orders, pre-orders, online orders) ---------- */
+var CAR={},carT={};
+function fitTrack(t,a){t.style.height=a.offsetHeight+'px';}
+window.addEventListener('resize',function(){document.querySelectorAll('.btrack').forEach(function(t){t.style.height='';});setTimeout(function(){Object.keys(CAR).forEach(carSync);runSync();},50);});
+function carHtml(id,slides,noun){
+  if(!slides.length)return '';
+  var n=slides.length;
+  return '<div class="bnav" id="cnav-'+id+'"'+(n>1?'':' hidden')+'><button type="button" class="arw" data-act="carprev" data-car="'+id+'" aria-label="Previous '+noun+'">&#8249;</button><div class="bdots">'
+    +(n<=12?slides.map(function(sl,i){return '<button type="button" data-act="cardot" data-car="'+id+'" data-i="'+i+'" aria-label="Show '+esc(sl.label||noun+' '+(i+1))+'"></button>';}).join(''):'')
+    +'</div><span class="bpos" id="cpos-'+id+'"></span><button type="button" class="arw" data-act="carnext" data-car="'+id+'" aria-label="Next '+noun+'">&#8250;</button></div>'
+    +'<div class="bcar"><div class="btrack" id="ctrack-'+id+'" aria-roledescription="carousel">'
+    +slides.map(function(sl){return '<div class="cslide'+(sl.one?' one':'')+'" data-ck="'+esc(sl.key)+'">'+sl.html+'</div>';}).join('')+'</div></div>';
+}
+function carIdx(id){var t=$('ctrack-'+id);if(!t||!t.children.length)return 0;var w=t.children[0].getBoundingClientRect().width+12;return Math.max(0,Math.min(t.children.length-1,Math.round(t.scrollLeft/w)));}
+function carSync(id){
+  var t=$('ctrack-'+id);if(!t)return;var i=carIdx(id),n=t.children.length,a=t.children[i];
+  if(a){CAR[id]=a.dataset.ck;fitTrack(t,a);}
+  var nav=$('cnav-'+id);if(!nav)return;
+  nav.querySelectorAll('.bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
+  $('cpos-'+id).textContent=(i+1)+' of '+n;
+  nav.querySelector('[data-act="carprev"]').disabled=i===0;nav.querySelector('[data-act="carnext"]').disabled=i>=n-1;
+}
+function carGo(id,i,instant){
+  var t=$('ctrack-'+id);if(!t||!t.children.length)return;
+  i=Math.max(0,Math.min(t.children.length-1,i));
+  var x=t.children[i].offsetLeft-t.children[0].offsetLeft;
+  if(instant){t.style.scrollBehavior='auto';t.scrollLeft=x;t.style.scrollBehavior='';}else t.scrollTo({left:x,behavior:'smooth'});
+  CAR[id]=t.children[i].dataset.ck;carSync(id);
+}
+function carInit(id,startKey){
+  var t=$('ctrack-'+id);if(!t)return;
+  var want=CAR[id]!=null?CAR[id]:startKey,i=0;
+  [].forEach.call(t.children,function(c,k){if(c.dataset.ck===want)i=k;});
+  carGo(id,i,true);
+  t.addEventListener('scroll',function(){clearTimeout(carT[id]);carT[id]=setTimeout(function(){carSync(id);},60);},{passive:true});
 }
 function localDT(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());}
 function updatePreview(){
@@ -1108,13 +1148,16 @@ function renderOrders(){
   var t=dayTotals(list);
   $('dayTiles').innerHTML=tile(money(t.sales),'Sales')+tile(t.n,'Orders')+tile(t.qty,'Units sold')+tile(money(t.unpaid),'Unpaid',t.unpaid>0?'neg':'');
   var groups=groupOrders(list);
-  $('dayList').innerHTML=groups.length?'<ul class="list">'+groups.map(function(g){
+  $('dayList').innerHTML=groups.length?carHtml('ord',groups.map(function(g){
     var items=g.lines.filter(notFee),feeL=g.lines.find(isFee),f=items[0]||g.lines[0],total=sum(g.lines,function(l){return l.qty*l.price;}),paid=g.lines.every(function(l){return l.paid;}),nl=items.length;
     var note=(g.lines.find(function(l){return l.note;})||{}).note;
     var body=nl>1?'<div class="olines">'+items.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(l.product)+' × '+qtyText(l)+' at '+money(l.price)+flavHtml(l)+'</span><span>'+money(l.qty*l.price)+'</span></div>';}).join('')+'</div>':'<span class="muted small">'+prodDot(f.product)+esc(f.product)+' × '+qtyText(f)+' at '+money(f.price)+flavHtml(f)+'</span>';
     body+=feeRow(feeL);
-    return '<li><div class="main"><strong>'+esc(f.customer||'Walk-in')+(f.fromReservation?' <span class="pill acc">Pre-order'+(f.batch?' · '+batchDot(f.batch)+esc(f.batch):'')+'</span>':'')+(nl>1?' <span class="pill">'+nl+' items</span>':'')+delPill(g.lines)+'</strong>'+body+(note?'<span class="remark">'+esc(note)+'</span>':'')+'</div><div class="side"><span class="amt">'+money(total)+'</span><button type="button" class="pill '+(paid?'good':'warn')+'" style="border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:600" data-act="paygroup" data-key="'+esc(g.key)+'" aria-label="'+(paid?'Paid. Mark unpaid':'Unpaid. Mark paid')+'">'+(paid?'Paid':'Unpaid')+'</button><button type="button" class="btn small quiet" data-act="odeliv" data-key="'+esc(g.key)+'">'+(g.lines.some(function(l){return l.delivery;})?'Make pickup':'Make delivery')+'</button><button type="button" class="btn small quiet" data-act="orcpt" data-key="'+esc(g.key)+'">Copy receipt</button><button type="button" class="btn small danger" data-del="ordergroup:'+esc(g.key)+'">Delete</button></div></li>';
-  }).join('')+'</ul>':emptyBox(ordersDay===ymd(new Date())?'No orders yet today. Add the first one above.':'No orders on this day.');
+    var html='<ul class="list">'+'<li><div class="main"><strong>'+esc(f.customer||'Walk-in')+(f.fromReservation?' <span class="pill acc">Pre-order'+(f.batch?' · '+batchDot(f.batch)+esc(f.batch):'')+'</span>':'')+(nl>1?' <span class="pill">'+nl+' items</span>':'')+delPill(g.lines)+'</strong>'+body+(note?'<span class="remark">'+esc(note)+'</span>':'')+'</div><div class="side"><span class="amt">'+money(total)+'</span><button type="button" class="pill '+(paid?'good':'warn')+'" style="border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:600" data-act="paygroup" data-key="'+esc(g.key)+'" aria-label="'+(paid?'Paid. Mark unpaid':'Unpaid. Mark paid')+'">'+(paid?'Paid':'Unpaid')+'</button><button type="button" class="btn small quiet" data-act="odeliv" data-key="'+esc(g.key)+'">'+(g.lines.some(function(l){return l.delivery;})?'Make pickup':'Make delivery')+'</button><button type="button" class="btn small quiet" data-act="orcpt" data-key="'+esc(g.key)+'">Copy receipt</button><button type="button" class="btn small danger" data-del="ordergroup:'+esc(g.key)+'">Delete</button></div></li>'+'</ul>';
+    return {key:g.lines[0].group||g.lines[0].id,html:html,one:true,label:(f.customer||'Walk-in')};
+  }),'order'):emptyBox(ordersDay===ymd(new Date())?'No orders yet today. Add the first one above.':'No orders on this day.');
+  carInit('ord');
+  var oc=$('ordCount');if(oc){oc.hidden=!groups.length;oc.textContent=groups.length+(groups.length===1?' order':' orders');}
 }
 var cart=[];
 function curItem(){return itemFrom('o','oProduct','oQty','oPrice');}
@@ -1765,7 +1808,7 @@ function renderReserve(){
     $('resList').innerHTML=emptyBox(resFilter==='upcoming'?'No pre-orders waiting. Add one above and it will show here until it becomes an order.':'Nothing here yet.');
   }else{
     var groups={};shown.forEach(function(g){var k=batchDateOf(g.lines[0]);(groups[k]||(groups[k]=[])).push(g);});
-    var asc=resFilter==='upcoming',keys=Object.keys(groups).sort(function(a,b){if(a===''||b==='')return a===''?1:-1;return (a<b)===asc?-1:1;}),html='';
+    var asc=resFilter==='upcoming',keys=Object.keys(groups).sort(function(a,b){if(a===''||b==='')return a===''?1:-1;return (a<b)===asc?-1:1;}),slides=[];
     keys.forEach(function(k){
       var head;
       if(k){
@@ -1773,9 +1816,10 @@ function renderReserve(){
         head='<strong>'+batchDot(batchName(k))+esc((batchName(k)||'Batch')+' · '+dateLabel(k))+'</strong><span class="muted small">'+(stockSummary(k)||r1(u)+' of '+r1(c)+' '+bw(c)+' used')+(over||stockRows(k).some(function(x){return x.left<0;})?' <span class="pill bad">Over limit</span>':'')+'</span>';
       }else head='<strong>No batch yet</strong><span class="muted small">Pick a batch for each pre-order</span>';
       groups[k].sort(function(a,b){var x=a.lines[0],y=b.lines[0];return x.date===y.date?(x.created||0)-(y.created||0):(x.date<y.date?-1:1);});
-      html+='<div class="resgroup"><div class="gh">'+head+'</div><ul class="list">'+groups[k].map(resRow).join('')+'</ul></div>';
+      slides.push({key:k||'none',label:k?(batchName(k)||'Batch')+' '+dateLabel(k):'No batch yet',html:'<div class="resgroup"><div class="gh">'+head+'</div><ul class="list">'+groups[k].map(resRow).join('')+'</ul></div>'});
     });
-    $('resList').innerHTML=html;
+    $('resList').innerHTML=carHtml('res',slides,'batch');
+    carInit('res');
   }
   $('capNote').textContent='Set which weekdays you make a batch, then how many of each product are available in each batch. Leave a product blank if you do not want to limit it. Pre-orders assigned to a batch are counted against what is available. If a single batch comes out different, open it in the list below and change its numbers. Only pre-orders count here.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el&&document.activeElement!==el)el.value=S.capacity.weekly[d];});
@@ -2053,6 +2097,9 @@ document.addEventListener('click',function(e){
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
+  else if(a==='carprev')carGo(t.dataset.car,carIdx(t.dataset.car)-1);
+  else if(a==='carnext')carGo(t.dataset.car,carIdx(t.dataset.car)+1);
+  else if(a==='cardot')carGo(t.dataset.car,Number(t.dataset.i));
   else if(a==='rmoveopen'){resMove=resMove===id?null:id;delete resMoveSel[id];renderReserve();}
   else if(a==='rmoveclose'){if(resMove)delete resMoveSel[resMove];resMove=null;renderReserve();}
   else if(a==='rmovego')moveRes(id);
@@ -2495,10 +2542,10 @@ function renderWeb(){
   if(!webOrders.length){$('webList').innerHTML=emptyBox('No online orders waiting. New ones from your website show up here.');return;}
   var keep=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#webList');
   if(keep)return;
-  $('webList').innerHTML=webOrders.map(function(o){
+  $('webList').innerHTML=carHtml('web',webOrders.map(function(o){
     var lines=webLines(o),pref=o.preferredBatch||'',bd=webSel[o.id]&&webSel[o.id].b!==undefined?webSel[o.id].b:pref,dd=webSel[o.id]&&webSel[o.id].d?webSel[o.id].d:(bd?nextPackDay(bd):'');
     var t=o.createdAt&&o.createdAt.toDate?o.createdAt.toDate().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'just now';
-    return '<div class="batch" data-web="'+esc(o.id)+'">'
+    return {key:o.id,label:'#'+o.queueNumber+' '+o.name,html:'<div class="batch" data-web="'+esc(o.id)+'">'
       +'<div class="bhead"><div><h3>#'+esc(o.queueNumber)+' '+esc(o.name)+'</h3><span class="muted small">'+esc(t)+' · '+esc(o.id)+'</span></div><span class="pill '+(o.fulfilment==='delivery'?'warn':'acc')+'">'+(o.fulfilment==='delivery'?'Delivery':'Pickup')+'</span></div>'
       +'<div class="olines">'+lines.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(qtyText(l))+' × '+esc(l.product)+esc(flavInline(l))+'</span><span>'+money(l.qty*l.price)+'</span></div>';}).join('')
       +(o.deliveryFee?'<div class="ol"><span>Delivery fee</span><span>'+money(o.deliveryFee)+'</span></div>':'')
@@ -2508,8 +2555,9 @@ function renderWeb(){
       +'<div class="field"><label>'+(o.fulfilment==='delivery'?'Delivery':'Pickup')+' date</label><input type="date" data-webd="'+esc(o.id)+'" value="'+esc(dd)+'"></div></div>'
       +webCheck(o,bd)
       +'<div class="actions"><button type="button" class="btn" data-act="webok" data-id="'+esc(o.id)+'">Approve</button><button type="button" class="btn danger" data-act="webno" data-id="'+esc(o.id)+'">'+(webDecline[o.id]?'Tap again to decline':'Decline')+'</button></div>'
-      +'</div>';
-  }).join('');
+      +'</div>'};
+  }),'online order');
+  carInit('web');
 }
 function webField(id){var el=document.querySelector('[data-webb="'+id+'"]'),dd=document.querySelector('[data-webd="'+id+'"]');return {b:el?el.value:'',d:dd?dd.value:''};}
 function approveWeb(id){

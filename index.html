@@ -399,9 +399,9 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
           <h3>Your details</h3>
           <label for="name">Name</label>
           <input id="name" autocomplete="name" maxlength="80">
-          <label for="phone">Mobile number</label>
-          <input id="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="0917 123 4567" aria-describedby="phoneHelp">
-          <p class="note" id="phoneHelp" style="margin-top:6px">We'll text or call this number to confirm your batch.</p>
+          <label for="phone">Philippine mobile number</label>
+          <input id="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="0917 123 4567" aria-describedby="phoneHelp">
+          <p class="note" id="phoneHelp" style="margin-top:6px">Philippine numbers only, starting with 09 or +63. We'll text or call to confirm your batch.</p>
           <label for="fb">Messenger name (optional)</label>
           <input id="fb" maxlength="80" placeholder="Name on Facebook">
           <label id="fLabel">Pickup or delivery</label>
@@ -767,7 +767,7 @@ $("fDel").onclick = () => setFulfilment("delivery");
 
 /* ---------- send order: details -> confirm -> send ---------- */
 const phDigits = v => String(v || "").replace(/\D/g, "");
-const phValid = v => /^(09\d{9}|639\d{9})$/.test(phDigits(v));
+const phValid = v => { const raw = String(v || "").trim(), d = phDigits(raw); if (/[^0-9+\s\-()]/.test(raw)) return false; if (raw.startsWith("+") && !raw.startsWith("+63")) return false; return /^(09\d{9}|639\d{9})$/.test(d); };
 const phNice = v => { const d = phDigits(v), l = d.startsWith("63") ? "0" + d.slice(2) : d; return `${l.slice(0,4)} ${l.slice(4,7)} ${l.slice(7)}`; };
 function details(){
   return { name: $("name").value.trim(), phone: $("phone").value.trim(), fb: $("fb").value.trim(),
@@ -780,7 +780,7 @@ function showStep(step){
   const el = step === "form" ? $("orderGrid") : $(step);
   el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
 }
-$("phone").addEventListener("input", () => { if ($("oErr").textContent && phValid($("phone").value)) $("oErr").textContent = ""; });
+$("phone").addEventListener("input", () => { const el = $("phone"), v = el.value.replace(/[^0-9+\s\-]/g, "").replace(/(?!^)\+/g, ""); if (v !== el.value) el.value = v; if ($("oErr").textContent && phValid($("phone").value)) $("oErr").textContent = ""; });
 $("submit").onclick = () => {
   const c = calc(), d = details();
   $("oErr").textContent = "";
@@ -788,7 +788,7 @@ $("submit").onclick = () => {
   if (c.problems.length){ $("oErr").textContent = c.problems[0]; return; }
   if (!d.name){ $("oErr").textContent = "Add your name."; $("name").focus(); return; }
   if (!d.phone){ $("oErr").textContent = "Add your mobile number so we can confirm your order."; $("phone").focus(); return; }
-  if (!phValid(d.phone)){ $("oErr").textContent = "Check your mobile number. It should look like 0917 123 4567."; $("phone").focus(); return; }
+  if (!phValid(d.phone)){ $("oErr").textContent = "Enter a Philippine mobile number, like 0917 123 4567 or +63 917 123 4567."; $("phone").focus(); return; }
   if (fulfilment === "delivery" && !d.addr){ $("oErr").textContent = "Add your delivery address."; $("addr").focus(); return; }
   const del = fulfilment === "delivery";
   $("cfName").textContent = d.name;
