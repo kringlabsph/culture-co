@@ -211,13 +211,14 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 .resgroup .list .main{flex:1 1 150px}
 .resgroup .list .side{flex:1 0 100%;justify-content:flex-start;padding-left:40px}
 .resgroup .gh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0 4px;border-bottom:1px solid var(--line)}
-.caprow{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(40px,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.caprow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .caprow:first-child{border-top:0}
 .capd{display:flex;flex-direction:column;min-width:0}
 .caprow .track{height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;display:block}
 .caprow .fill{height:100%;border-radius:5px;background:var(--rev)}
 .caprow .fill.over{background:var(--bad)}
 .capcell{white-space:nowrap}
+.capon{display:flex;align-items:center;gap:6px;justify-self:end;font-weight:600}
 .captubs{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
 .captubs input{width:70px;min-height:34px;padding:4px 6px}
 .capweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
@@ -513,7 +514,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
   <section class="tab" id="tab-reserve" hidden>
     <div class="card" id="webCard" hidden>
       <div class="cardhead"><h2>Online orders</h2><span class="pill acc" id="webCount"></span></div>
-      <p class="muted small">New pre-orders from your website. Pick the batch and date, then approve to add them to your pre-orders and stock. The customer sees the batch and date when they track their order.</p>
+      <p class="muted small">New pre-orders from your website. Pick the delivery day and date, then approve to add them to your pre-orders and stock. The customer sees the delivery day and date when they track their order.</p>
       <div id="webNotes" style="display:flex;flex-direction:column;gap:10px"></div>
       <div id="webList" style="display:flex;flex-direction:column;gap:12px"></div>
     </div>
@@ -525,7 +526,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
         <div class="form">
           <div class="field wide"><label for="rCustomer">Customer name</label><input id="rCustomer" data-combo="customers" maxlength="60" required></div>
           <div class="field"><label for="rDate">Pickup or delivery date</label><input id="rDate" type="date" required></div>
-          <div class="field wide"><label for="rBatch">Which batch</label><select id="rBatch"></select></div>
+          <div class="field wide"><label for="rBatch">Delivery day</label><select id="rBatch"></select></div>
           <div class="field"><label for="rMode">Pickup or delivery</label><select id="rMode"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
           <div class="field" id="rFeeWrap" hidden><label for="rFee">Delivery fee (<span class="cur">&#8369;</span>)</label><input id="rFee" type="number" min="0" step="any" inputmode="decimal"></div>
           <div class="field wide"><label for="rNote">Remarks</label><input id="rNote" maxlength="200" placeholder="Delivery address, flavor, anything to remember"></div>
@@ -558,11 +559,10 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
     </div>
 
     <div class="card">
-      <h2>Batches left</h2>
-      <div id="carryBox" style="display:flex;flex-direction:column;gap:10px"></div>
+      <h2>Stock per delivery day</h2>
       <p class="muted small" id="capNote"></p>
-      <div class="form"><div class="field"><label for="capGreek">Greek tubs you make per batch</label><input id="capGreek" type="number" min="1" step="1" inputmode="numeric"></div></div>
-      <div style="display:flex;flex-direction:column;gap:6px"><span class="lbl">Batches you make each week</span>
+      <div class="form"><div class="field"><label for="capGreek">Greek tubs from one daily batch</label><input id="capGreek" type="number" min="1" step="1" inputmode="numeric"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span class="lbl">Delivery days (1 = you deliver that day, 0 = no delivery)</span>
         <div class="capweek" id="capWeek">
           <div class="field"><label for="capw-1">Mon</label><input id="capw-1" data-capw="1" type="number" min="0" step="0.5" inputmode="decimal"></div>
           <div class="field"><label for="capw-2">Tue</label><input id="capw-2" data-capw="2" type="number" min="0" step="0.5" inputmode="decimal"></div>
@@ -782,6 +782,7 @@ function applySettings(d){
   if(!S.costs||typeof S.costs!=='object')S.costs=fresh.costs;
   ['powder','starter','sugar','jam'].forEach(function(k){S.costs[k]=Math.max(0,Number(S.costs[k])||0);});
   if(!S.batchColors||typeof S.batchColors!=='object')S.batchColors={};
+  if(S.carried&&typeof S.carried==='object'){Object.keys(S.carried).forEach(function(k){var c=S.carried[k];if(c&&c.n>0&&c.to&&S.capacity&&S.capacity.tubs)delete S.capacity.tubs[c.to];});delete S.carried;}
   S.deliveryFee=isFinite(Number(S.deliveryFee))?Math.max(0,Number(S.deliveryFee)):20;
   if(!Array.isArray(S.flavors))S.flavors=fresh.flavors.slice();
   S.flavors=S.flavors.map(function(x){return String(x).trim();}).filter(function(x,i,a){return x&&a.indexOf(x)===i;});
@@ -1667,7 +1668,7 @@ var GREEK=/greek/i;
 function batchDateOf(r){return r.batchDate===undefined?r.date:(r.batchDate||'');}
 function baseTubs(dow){var w=S.capacity.weeklyTubs[dow];return (isFinite(w)&&w>0)?w:Math.max(1,S.recipe.greekPerBatch||7);}
 function tubsFor(date){var v=S.capacity.tubs[date];return (isFinite(v)&&v>0)?v:baseTubs(parseYmd(date).getDay());}
-function dowBatchName(d){var order=[1,2,3,4,5,6,0].filter(function(x){return S.capacity.weekly[x]>0;}),i=order.indexOf(d);return i>=0?'Batch '+(i+1):null;}
+function dowBatchName(d){return S.capacity.weekly[d]>0?DOW[d]+' delivery':null;}
 function batchesFor(name,qty,bdate){
   if(GREEK.test(name))return bdate?qty/tubsFor(bdate):0;
   var p=prodInfo(name);return p&&S.recipe.mixL>0?qty*p.kg/S.recipe.mixL:0;
@@ -1676,60 +1677,50 @@ function capFor(date){var v=S.capacity.byDate[date];return typeof v==='number'?v
 function usedOn(bdate){return sum(mem.reservations.filter(function(r){return bdate&&batchDateOf(r)===bdate&&r.status!=='cancelled';}),function(r){return batchesFor(r.product,piecesOf(r),bdate);});}
 function greekOn(bdate){return sum(mem.reservations.filter(function(r){return bdate&&batchDateOf(r)===bdate&&r.status!=='cancelled'&&GREEK.test(r.product);}),function(r){return r.qty;});}
 function shortName(n){return String(n).replace(/\s*\(.*?\)\s*/g,' ').replace(/\s*@.*$/,'').replace(/\s+/g,' ').trim();}
-/* ---------- leftover Greek tubs roll into the next batch ---------- */
-function greekMade(k){
-  var b=mem.batches.filter(function(x){return ymd(new Date(x.startAt))===k&&x.packed!=null;})[0];
-  return b?{n:b.packed,real:true}:{n:tubsFor(k),real:false};
-}
-function greekSold(k,next){
-  var pre=pcsOn(k,'Greek');
-  var walk=sum(mem.orders.filter(function(o){return !o.fee&&!o.fromReservation&&GREEK.test(o.product)&&o.date>=k&&(!next||o.date<next);}),piecesOf);
-  return pre+walk;
-}
-function carryList(){
-  if(!S.carried||typeof S.carried!=='object')S.carried={};
-  var out=[],today=ymd(new Date()),d0=new Date(),past=[];
-  for(var i=14;i>=0;i--){var k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-i));if(capFor(k)>0||mem.batches.some(function(x){return x.packed!=null&&ymd(new Date(x.startAt))===k;}))past.push(k);}
-  var ahead=batchDates().filter(function(k){return k>today;});
-  past.forEach(function(k,ix){
-    if(S.carried[k])return;
-    var nextAny=past[ix+1]||ahead[0]||null,to=ahead.find(function(x){return x>k;});
-    if(!to)return;
-    var m=greekMade(k),sold=greekSold(k,nextAny),left=m.n-sold;
-    if(left>0&&m.real)out.push({k:k,to:to,made:m.n,real:m.real,sold:sold,left:left});
-  });
-  return out;
-}
-function renderCarry(){
-  var el=$('carryBox');if(!el||!greekProd())return;
-  var list=carryList(),done=Object.keys(S.carried||{}).filter(function(k){return S.carried[k]&&S.carried[k].n>0&&S.carried[k].to>=ymd(new Date());});
-  el.innerHTML=list.map(function(c){
-    return '<div class="nextstart"><div class="t"><strong>'+c.left+' Greek tub'+(c.left===1?'':'s')+' left from '+esc((batchName(c.k)||'Batch')+' · '+dateLabel(c.k))+'</strong>'
-      +'<span class="muted small">'+(c.real?'Made':'Planned')+' '+c.made+', sold '+c.sold+'. Add '+(c.left===1?'it':'them')+' to '+esc((batchName(c.to)||'the next batch')+' · '+dateLabel(c.to))+'?</span></div>'
-      +'<div class="actions"><button type="button" class="btn small" data-act="carrygo" data-k="'+c.k+'">Add '+c.left+' to '+esc(batchName(c.to)||'next batch')+'</button><button type="button" class="btn small quiet" data-act="carryskip" data-k="'+c.k+'">Not needed</button></div></div>';
-  }).join('')+done.map(function(k){var c=S.carried[k];
-    return '<p class="muted small">'+c.n+' leftover Greek tub'+(c.n===1?'':'s')+' from '+esc((batchName(k)||'Batch')+' · '+dateLabel(k))+' added to '+esc((batchName(c.to)||'Batch')+' · '+dateLabel(c.to))+'. <button type="button" class="btn small quiet" style="min-height:28px;padding:2px 10px" data-act="carryundo" data-k="'+k+'">Undo</button></p>';
-  }).join('');
-}
-function carryGo(k){
-  var c=carryList().find(function(x){return x.k===k;});if(!c)return;
-  S.capacity.tubs[c.to]=tubsFor(c.to)+c.left;
-  S.carried[k]={to:c.to,n:c.left,at:Date.now()};
-  saveSettings();renderAll();
-  toast('Added '+c.left+' Greek tub'+(c.left===1?'':'s')+' to '+(batchName(c.to)||'the next batch')+'.');
-}
-function carrySkip(k){if(!S.carried)S.carried={};S.carried[k]={n:0,skip:true,at:Date.now()};saveSettings();renderAll();}
-function carryUndo(k){
-  var c=S.carried&&S.carried[k];if(!c)return;
-  if(c.n>0&&c.to){var v=tubsFor(c.to)-c.n,base=baseTubs(parseYmd(c.to).getDay());if(v===base)delete S.capacity.tubs[c.to];else S.capacity.tubs[c.to]=Math.max(1,v);}
-  delete S.carried[k];saveSettings();renderAll();toast('Undone.');
-}
 function greekProd(){return S.products.find(function(p){return GREEK.test(p.name);})||null;}
 function prodKey(name){if(GREEK.test(name)){var g=greekProd();return g?g.name:name;}var p=prodInfo(name);return p?p.name:name;}
 function unitOf(p){return GREEK.test(p.name)||!(p.packQty>1)?'tubs':'pcs';}
 function baseStock(dow,name){if(GREEK.test(name))return baseTubs(dow);var w=S.capacity.weeklyStock[dow];return w&&typeof w[name]==='number'?w[name]:null;}
+/* ---------- Greek stock per delivery day = daily batches that pack for it + unsold from the last delivery ---------- */
+function isDeliv(k){return capFor(k)>0;}
+function delivOnOrAfter(k){var d=parseYmd(k);for(var i=0;i<15;i++){var x=ymd(new Date(d.getFullYear(),d.getMonth(),d.getDate()+i));if(isDeliv(x))return x;}return null;}
+function delivBefore(k){var d=parseYmd(k);for(var i=1;i<15;i++){var x=ymd(new Date(d.getFullYear(),d.getMonth(),d.getDate()-i));if(isDeliv(x))return x;}return null;}
+function feedDay(b){
+  var at=b.at||{},steps=b.steps.map(function(st,i){return (i>0&&stepMode(st)==='manual'&&at[i]==null)?{label:st.label,mins:st.mins,mode:'after'}:st;});
+  var t=stepTimes({startAt:b.startAt,steps:steps,at:at,done:b.done||{}}),last=t[t.length-1],ts=last&&(last.start!=null?last.start:last.end);
+  return ts==null?null:delivOnOrAfter(ymd(new Date(ts)));
+}
+function batchTubs(b){if(b.packed!=null)return Math.max(0,b.packed);var r=b.recipe||{};return isFinite(r.tubsLow)&&r.tubsLow>0?r.tubsLow:Math.max(1,S.recipe.greekPerBatch||7)*(b.size||1);}
+function greekFeed(k){
+  var out={made:0,planned:0,list:[]},today=ymd(new Date()),from=delivBefore(k)||ymd(new Date(parseYmd(k).getTime()-7*86400000));
+  mem.batches.forEach(function(b){if(feedDay(b)===k){var n=batchTubs(b);out.made+=n;out.list.push({name:b.name,n:n,real:b.packed!=null});}});
+  var d=parseYmd(from<today?today:from),end=parseYmd(k),p=clockParts();
+  for(;d<=end;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)){
+    var day=ymd(d);
+    if(S.prodDays.indexOf(d.getDay())<0||S.skipStart===day)continue;
+    if(mem.batches.some(function(b){return ymd(new Date(b.startAt))===day;}))continue;
+    var ts=new Date(d.getFullYear(),d.getMonth(),d.getDate(),p[0],p[1]).getTime();
+    if(feedDay({startAt:ts,steps:S.steps,at:{},done:{}})===k)out.planned+=Math.max(1,S.recipe.greekPerBatch||7);
+  }
+  return out;
+}
+function greekSoldFor(k){
+  var nx=delivOnOrAfter(ymd(new Date(parseYmd(k).getTime()+86400000)));
+  return pcsOn(k,'Greek')+sum(mem.orders.filter(function(o){return !o.fee&&!o.fromReservation&&GREEK.test(o.product)&&o.date>=k&&(!nx||o.date<nx);}),piecesOf);
+}
+function greekLeftover(k,depth){var prev=delivBefore(k);if(!prev||prev>ymd(new Date())||depth>2)return 0;return Math.max(0,greekStock(prev,depth+1)-greekSoldFor(prev));}
+function greekStock(k,depth){
+  var v=S.capacity.tubs[k];if(isFinite(v)&&v>0)return v;
+  var f=greekFeed(k);return f.made+f.planned+greekLeftover(k,depth||0);
+}
+function greekHint(k){
+  if(isFinite(S.capacity.tubs[k])&&S.capacity.tubs[k]>0)return '. Set by hand. Clear it to go back to automatic ('+(function(){var f=greekFeed(k);return f.made+f.planned+greekLeftover(k,0);})()+').';
+  var f=greekFeed(k),lo=greekLeftover(k,0),parts=[];
+  if(f.made)parts.push(f.made+' from started batches');if(f.planned)parts.push(f.planned+' planned');if(lo)parts.push(lo+' left over');
+  return parts.length?'. Automatic: '+parts.join(' + '):'. Automatic: no batches packed in time yet';
+}
 function stockFor(date,name){
-  if(GREEK.test(name))return Math.round(tubsFor(date)*Math.max(capFor(date),0));
+  if(GREEK.test(name))return isDeliv(date)?greekStock(date,0):0;
   var o=S.capacity.stock[date];if(o&&typeof o[name]==='number')return o[name];
   return baseStock(parseYmd(date).getDay(),name);
 }
@@ -1746,19 +1737,18 @@ function stockSummary(bdate,sep){
 function weekBatchName(ts){
   var d=new Date(ts),day=ymd(d),back=(d.getDay()+6)%7,mon=new Date(d.getFullYear(),d.getMonth(),d.getDate()-back).getTime(),nxt=mon+7*86400000;
   var sameDay=mem.batches.some(function(b){return ymd(new Date(b.startAt))===day;});
-  var bn=sameDay?null:batchName(day);
-  if(bn&&bn!=='Extra batch')return bn;
-  return 'Batch '+(mem.batches.filter(function(b){return b.startAt>=mon&&b.startAt<nxt;}).length+1);
+  var n=mem.batches.filter(function(b){return ymd(new Date(b.startAt))===day;}).length;
+  return DOW[d.getDay()]+' batch'+(n?' '+(n+1):'');
 }
+function delivLabel(k){return dateLabel(k)+' delivery';}
 function batchName(date){
   if(!date||capFor(date)<=0)return null;
-  var dow=parseYmd(date).getDay(),order=[1,2,3,4,5,6,0].filter(function(d){return S.capacity.weekly[d]>0;}),i=order.indexOf(dow);
-  return i>=0?'Batch '+(i+1):'Extra batch';
+  return DOW[parseYmd(date).getDay()]+' delivery';
 }
 function batchDates(){var out=[],d0=new Date();for(var i=0;i<28;i++){var k=ymd(new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i));if(capFor(k)>0)out.push(k);}return out;}
 function batchOpts(selected){
   var ds=batchDates();if(selected&&ds.indexOf(selected)<0)ds.unshift(selected);
-  return '<option value="">Not assigned yet</option>'+ds.map(function(k){return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+esc((batchName(k)||'Batch')+' · '+dateLabel(k))+'</option>';}).join('');
+  return '<option value="">Not assigned yet</option>'+ds.map(function(k){return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+esc(delivLabel(k))+'</option>';}).join('');
 }
 var batchManual=false,stockOpen={};
 document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset&&d.dataset.sd){if(d.open)stockOpen[d.dataset.sd]=1;else delete stockOpen[d.dataset.sd];}},true);
@@ -1779,7 +1769,7 @@ function updateResCheck(){
   $('rTotal').textContent=n===0?'':(n===1?'Total ':'Pre-order total, '+n+' items: ')+money(tot)+(n>0&&rfee>0?' (includes '+money(rfee)+' delivery)':'');
   $('rGo').textContent=overConfirm?'Over the limit. Reserve anyway':(n>1?'Reserve ('+n+' items)':'Reserve');
   var info=function(h){box.className='banner info';box.innerHTML=h;};
-  if(!n){info('<span class="muted">Pick a product and quantity to see how much is left in the batch.</span>');return null;}
+  if(!n){info('<span class="muted">Pick a product and quantity to see how much is left for that delivery day.</span>');return null;}
   if(!bdate){info('<span>Choose which batch this pre-order comes from to check what is left.</span>');return {over:false};}
   var unknown=items.filter(function(l){return !GREEK.test(l.product)&&!prodInfo(l.product);});
   var used=usedOn(bdate),add=sum(items,function(l){return batchesFor(l.product,piecesOf(l),bdate);}),cap=capFor(bdate),after=used+add,bn=batchName(bdate)||'This batch';
@@ -1837,7 +1827,7 @@ function resRow(g){
     btns='<button type="button" class="btn small quiet" data-act="rdeliv" data-id="'+esc(key)+'">'+(g.lines.some(function(l){return l.delivery;})?'Make pickup':'Make delivery')+'</button><button type="button" class="btn small quiet" data-act="rcpt-res" data-id="'+esc(key)+'">Copy message</button><button type="button" class="btn small quiet" data-act="rmoveopen" data-id="'+esc(key)+'">Reschedule</button><button type="button" class="btn small '+(resCancelArm[key]?'danger':'quiet')+'" data-act="rcancel" data-id="'+esc(key)+'">'+(resCancelArm[key]?'Tap again to cancel':'Cancel order')+'</button><button type="button" class="btn small danger" data-del="resgroup:'+esc(key)+'">Delete</button>';
   }
   var pick=r.status==='reserved'&&resMove===key?moveFormHtml(g,bd)
-    :r.status==='reserved'&&bd?'<span class="small muted" style="margin-top:4px">'+batchDot(batchName(bd))+'Made in '+esc((batchName(bd)||'Batch')+' · '+dateLabel(bd))+'</span>'
+    :r.status==='reserved'&&bd?'<span class="small muted" style="margin-top:4px">'+batchDot(batchName(bd))+'For '+esc(delivLabel(bd))+'</span>'
     :r.status==='reserved'?'<label class="small muted" style="display:flex;align-items:center;gap:6px;margin-top:4px" for="rb-'+esc(key)+'">Batch <select id="rb-'+esc(key)+'" data-act="rbatch" data-id="'+esc(key)+'" style="min-height:34px;padding:4px 6px;width:auto;max-width:100%">'+batchOpts(bd)+'</select></label>':'';
   var body=nl>1?'<div class="olines">'+items.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(l.product)+' × '+qtyText(l)+' at '+money(l.price)+flavHtml(l)+'</span><span>'+money(l.qty*l.price)+(r.status==='reserved'?' <button type="button" class="btn small quiet" style="min-height:28px;padding:2px 8px" data-act="rlrm" data-lid="'+l.id+'" aria-label="Remove '+esc(l.product)+'">Remove</button>':'')+'</span></div>';}).join('')+'</div>':'<span class="muted small">'+prodDot(r.product)+esc(r.product)+' × '+qtyText(r)+' at '+money(r.price)+flavHtml(r)+'</span>';
   body+=feeRow(feeL);
@@ -1862,30 +1852,28 @@ function renderReserve(){
       var head;
       if(k){
         var u=usedOn(k),c=capFor(k),over=u>c+0.001;
-        head='<strong>'+batchDot(batchName(k))+esc((batchName(k)||'Batch')+' · '+dateLabel(k))+'</strong><span class="muted small">'+(stockSummary(k)||r1(u)+' of '+r1(c)+' '+bw(c)+' used')+(over||stockRows(k).some(function(x){return x.left<0;})?' <span class="pill bad">Over limit</span>':'')+'</span>';
-      }else head='<strong>No batch yet</strong><span class="muted small">Pick a batch for each pre-order</span>';
+        head='<strong>'+batchDot(batchName(k))+esc(delivLabel(k))+'</strong><span class="muted small">'+(stockSummary(k)||r1(u)+' of '+r1(c)+' '+bw(c)+' used')+(over||stockRows(k).some(function(x){return x.left<0;})?' <span class="pill bad">Over limit</span>':'')+'</span>';
+      }else head='<strong>No delivery day yet</strong><span class="muted small">Pick a delivery day for each pre-order</span>';
       groups[k].sort(function(a,b){var x=a.lines[0],y=b.lines[0];return x.date===y.date?(x.created||0)-(y.created||0):(x.date<y.date?-1:1);});
-      slides.push({key:k||'none',label:k?(batchName(k)||'Batch')+' '+dateLabel(k):'No batch yet',html:'<div class="resgroup"><div class="gh">'+head+'</div><ul class="list">'+groups[k].map(resRow).join('')+'</ul></div>'});
+      slides.push({key:k||'none',label:k?(batchName(k)||'Batch')+' '+dateLabel(k):'No delivery day yet',html:'<div class="resgroup"><div class="gh">'+head+'</div><ul class="list">'+groups[k].map(resRow).join('')+'</ul></div>'});
     });
     $('resList').innerHTML=carHtml('res',slides,'batch');
     carInit('res');
   }
-  renderCarry();
-  $('capNote').textContent='Set which weekdays you make a batch, then how many of each product are available in each batch. Leave a product blank if you do not want to limit it. Pre-orders assigned to a batch are counted against what is available. If a single batch comes out different, open it in the list below and change its numbers. Only pre-orders count here.';
+  $('capNote').textContent='Customers pre-order for a delivery day. Greek stock for each delivery day is worked out for you: the daily batches that get packed in time for it (your planned batches until you start them, then the real Greek tubs made once you enter them), plus anything unsold from the last delivery day. For the other products, enter how many you make for each delivery day, or leave blank for no limit. If you cannot deliver on the day, move the order to Tue or Thu with Reschedule.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el&&document.activeElement!==el)el.value=S.capacity.weekly[d];});
   var tw=$('capTubsWeek');
   if(!tw.contains(document.activeElement)){
     var days=[1,2,3,4,5,6,0].filter(function(d){return S.capacity.weekly[d]>0;});
-    tw.innerHTML=days.length&&S.products.length?'<span class="lbl">Available in each batch</span><div class="scroll"><table class="stocktbl"><thead><tr><th>Product</th>'+days.map(function(d){return '<th>'+esc(dowBatchName(d))+'<br>'+DOW[d]+'</th>';}).join('')+'</tr></thead><tbody>'+S.products.map(function(p,pi){var g=GREEK.test(p.name);return '<tr><td>'+prodDot(p.name)+esc(shortName(p.name))+' <span class="muted small">'+unitOf(p)+'</span></td>'+days.map(function(d){var v=baseStock(d,p.name),lab=esc(shortName(p.name)+' available in '+dowBatchName(d)+' ('+DOW[d]+')');return '<td><input type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" aria-label="'+lab+'" '+(g?'data-captw="'+d+'"':'data-stockw="'+d+'" data-pn="'+esc(p.name)+'" placeholder="–"')+' value="'+(v==null?'':v)+'"></td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>':'';
+    tw.innerHTML=days.length&&S.products.length?'<span class="lbl">Available for each delivery day</span><div class="scroll"><table class="stocktbl"><thead><tr><th>Product</th>'+days.map(function(d){return '<th>'+esc(dowBatchName(d))+'<br>'+DOW[d]+'</th>';}).join('')+'</tr></thead><tbody>'+S.products.map(function(p,pi){var g=GREEK.test(p.name);return '<tr><td>'+prodDot(p.name)+esc(shortName(p.name))+' <span class="muted small">'+unitOf(p)+'</span></td>'+days.map(function(d){var v=baseStock(d,p.name),lab=esc(shortName(p.name)+' available in '+dowBatchName(d)+' ('+DOW[d]+')');if(g)return '<td class="muted small" style="text-align:center">From batches</td>';return '<td><input type="number" min="0" step="1" inputmode="numeric" aria-label="'+lab+'" data-stockw="'+d+'" data-pn="'+esc(p.name)+'" placeholder="–" value="'+(v==null?'':v)+'"></td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>':'';
   }
   var box=$('capRows');
   if(!box.contains(document.activeElement)){
     var html2='',d0=new Date();
     for(var i=0;i<14;i++){
       var d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i),k2=ymd(d),cap=capFor(k2),used=usedOn(k2),left=cap-used,over2=left<-0.001,pct=cap>0?Math.min(100,used/cap*100):(used>0?100:0),bn=batchName(k2);
-      var sub=cap<=0?'No batch':(over2?'Over by '+r1(-left)+' '+bw(-left):(stockRows(k2).length?'':'No products limited yet'));
-      html2+='<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+(bn?' · '+batchDot(bn)+esc(bn):'')+'</strong><span class="muted small">'+sub+'</span></div><span class="track"><span class="fill'+(over2?' over':'')+'" style="display:block;width:'+pct+'%"></span></span><span class="capcell small"><b>'+r1(used)+'</b> of <input id="cap-'+k2+'" type="number" min="0" step="0.5" inputmode="decimal" data-capdate="'+k2+'" value="'+cap+'" aria-label="Batches available on '+k2+'"></span>'
-        +(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available in this batch</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?tubsFor(k2):stockFor(k2,p.name),used3=pcsOn(k2,p.name);return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div>'+(capFor(k2)!==1?'<span class="muted small">Greek is per batch, times '+r1(capFor(k2))+' '+bw(capFor(k2))+' this day.</span>':'')+'</div></details>':'')+'</div>';
+      var sub=cap<=0?'No delivery':(over2?'Over by '+r1(-left)+' '+bw(-left):(stockRows(k2).length?'':'No products limited yet'));
+      html2+='<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?(isFinite(S.capacity.tubs[k2])&&S.capacity.tubs[k2]>0?S.capacity.tubs[k2]:null):stockFor(k2,p.name),used3=pcsOn(k2,p.name);return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered'+(g?greekHint(k2):'')+'</span></div>';}).join('')+'</div></div></details>':'')+'</div>';
     }
     box.innerHTML=html2;
   }
@@ -1980,11 +1968,11 @@ function moveFormHtml(g,bd){
   var items=lines.filter(notFee),add={};
   if(s.b&&s.b!==bd)items.forEach(function(l){var k=prodKey(l.product);add[k]=(add[k]||0)+piecesOf(l);});
   var rows=s.b?stockRows(s.b,add).filter(function(x){return x.add>0;}):[],over=rows.filter(function(x){return x.left<0;});
-  var chk=!s.b?'':s.b===bd?'<p class="muted small">Same batch. Only the date changes.</p>'
+  var chk=!s.b?'':s.b===bd?'<p class="muted small">Same delivery day. Only the date changes.</p>'
     :rows.length?'<p class="small'+(over.length?' left0':' muted')+'">'+(over.length?'Over stock: ':'After moving: ')+rows.map(function(x){return esc(shortName(x.p.name))+' '+(x.left<0?'over by '+(-x.left):x.left+' left');}).join(' · ')+'</p>':'';
   var same=s.b===(bd||'')&&s.d===r.date;
-  return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Move to another batch</span><div class="form">'
-    +'<div class="field"><label for="mvb-'+esc(key)+'">New batch</label><select id="mvb-'+esc(key)+'" data-mvb="'+esc(key)+'">'+batchOpts(s.b)+'</select></div>'
+  return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Move to another day</span><p class="muted small" style="margin:0">Can\'t deliver that day? Keep the delivery day and pick Tue or Thu as the date.</p><div class="form">'
+    +'<div class="field"><label for="mvb-'+esc(key)+'">New delivery day</label><select id="mvb-'+esc(key)+'" data-mvb="'+esc(key)+'">'+batchOpts(s.b)+'</select></div>'
     +'<div class="field"><label for="mvd-'+esc(key)+'">New '+(del?'delivery':'pickup')+' date</label><input type="date" id="mvd-'+esc(key)+'" data-mvd="'+esc(key)+'" value="'+esc(s.d)+'"></div></div>'
     +chk
     +'<div class="actions"><button type="button" class="btn small" data-act="rmovego" data-id="'+esc(key)+'"'+(same?' disabled':'')+'>Move and notify customer</button><button type="button" class="btn small quiet" data-act="rmoveclose">Close</button></div></div>';
@@ -1992,7 +1980,7 @@ function moveFormHtml(g,bd){
 function moveRes(key){
   var lines=rLines(key).filter(function(x){return x.status==='reserved';});if(!lines.length)return;
   var s=resMoveSel[key]||{},r=lines[0],from=batchDateOf(r);
-  if(!s.b){toast('Pick the new batch.');return;}
+  if(!s.b){toast('Pick the new delivery day.');return;}
   if(!s.d){toast('Pick the new pickup or delivery date.');return;}
   if(s.b===(from||'')&&s.d===r.date){toast('Nothing changed.');return;}
   var o=resNoteO(lines);
@@ -2027,7 +2015,7 @@ function exportReservations(){
   if(!l.length){toast('No pre-orders to export yet.');return;}
   var label={reserved:'Waiting',converted:'Ordered',cancelled:'Cancelled'};
   var num2={},nn=0;l.forEach(function(r){var k=rKey(r);if(!num2[k])num2[k]=++nn;});
-  var rows=[['Pre-order no.','Pickup or delivery date','Batch','Customer','Product','Quantity','Pieces','Flavors','Price each','Total','Status','Batches used','Remarks']];
+  var rows=[['Pre-order no.','Pickup or delivery date','Delivery day','Customer','Product','Quantity','Pieces','Flavors','Price each','Total','Status','Batches used','Remarks']];
   l.forEach(function(r){var bd=batchDateOf(r);rows.push([num2[rKey(r)],r.date,bd?(batchName(bd)||'Batch')+' '+bd:'Not assigned',r.customer,r.product,r.qty,piecesOf(r),flavText(r),r.price,r2(r.qty*r.price),label[r.status]||r.status,r2(batchesFor(r.product,piecesOf(r),bd)),r.note||'']);});
   saveFile('culture-co-preorders-'+ymd(new Date())+'.csv',csv(rows));
 }
@@ -2147,9 +2135,6 @@ document.addEventListener('click',function(e){
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
-  else if(a==='carrygo')carryGo(t.dataset.k);
-  else if(a==='carryskip')carrySkip(t.dataset.k);
-  else if(a==='carryundo')carryUndo(t.dataset.k);
   else if(a==='carprev')carGo(t.dataset.car,carIdx(t.dataset.car)-1);
   else if(a==='carnext')carGo(t.dataset.car,carIdx(t.dataset.car)+1);
   else if(a==='cardot')carGo(t.dataset.car,Number(t.dataset.i));
@@ -2217,7 +2202,7 @@ document.addEventListener('change',function(e){
   }
   else if(t.dataset&&t.dataset.captubs){
     var tk=t.dataset.captubs,tv=Math.round(num(t.value));
-    if(tv>0&&tv!==baseTubs(parseYmd(tk).getDay()))S.capacity.tubs[tk]=tv;else delete S.capacity.tubs[tk];
+    if(t.value===''||!(tv>0))delete S.capacity.tubs[tk];else S.capacity.tubs[tk]=tv;
     saveSettings();renderAll();
   }
   else if(t.dataset&&t.dataset.pflav!==undefined){
@@ -2246,6 +2231,11 @@ document.addEventListener('change',function(e){
   }
   else if(t.dataset&&t.dataset.capw!==undefined){
     S.capacity.weekly[Number(t.dataset.capw)]=Math.max(0,num(t.value));saveSettings();renderAll();
+  }
+  else if(t.dataset&&t.dataset.capon){
+    var ok=t.dataset.capon,ov=t.checked?Math.max(1,S.capacity.weekly[parseYmd(ok).getDay()]||1):0;
+    if(ov===S.capacity.weekly[parseYmd(ok).getDay()])delete S.capacity.byDate[ok];else S.capacity.byDate[ok]=ov;
+    saveSettings();renderAll();
   }
   else if(t.dataset&&t.dataset.capdate){
     var ck=t.dataset.capdate,cv=Math.max(0,num(t.value));
@@ -2496,19 +2486,17 @@ var WEB_STATUS_NOTE='Online',webNotes=[];
 function webSiteUrl(){return location.origin+location.pathname.replace(/[^/]*$/,'');}
 function longDate(d){return parseYmd(d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
 function webMsg(n){
-  var o=n.o,first=String(o.name||'').trim().split(/\s+/)[0]||'there',no=o.queueNumber?' #'+o.queueNumber:'',del=o.fulfilment==='delivery';
+  var o=n.o,first=String(o.name||'').trim().split(/\s+/)[0]||'there',no=o.queueNumber?' #'+o.queueNumber:'',del=o.fulfilment==='delivery',how=del?'Delivery':'Pickup';
   var track=o.id?'\nTrack it anytime: '+webSiteUrl()+'#track (code '+o.id+')':'';
-  if(n.kind==='declined')return 'Hi '+first+', sorry, we couldn\'t fit your Culture Co. pre-order'+no+' into our next batches. Reply here and we\'ll find another batch for you. Thank you!';
+  if(n.kind==='declined')return 'Hi '+first+', sorry, we couldn\'t fit your Culture Co. pre-order'+no+' into our next delivery days. Reply here and we\'ll find another day for you. Thank you!';
   if(n.kind==='cancelled')return 'Hi '+first+', we\'re sorry, but we had to cancel your Culture Co. pre-order'+no
-    +(n.b?' for '+(batchName(n.b)||'the batch')+' ('+longDate(n.b)+')':'')+'.\n'
-    +'If you already paid, we\'ll refund you in full. Reply here if you\'d like us to book you into another batch.\nSorry for the trouble, and thank you!';
-  if(n.kind==='rescheduled')return 'Hi '+first+'! A quick update on your Culture Co. pre-order'+no+'. We moved it to a new batch:\n'
-    +(batchName(n.b)||'Batch')+' ('+longDate(n.b)+')\n'
-    +'New '+(del?'delivery':'pickup')+' date: '+longDate(n.d)+'\n'
+    +(n.d||n.b?' for '+longDate(n.d||n.b):'')+'.\n'
+    +'If you already paid, we\'ll refund you in full. Reply here if you\'d like us to book you for another day.\nSorry for the trouble, and thank you!';
+  if(n.kind==='rescheduled')return 'Hi '+first+'! A quick update on your Culture Co. pre-order'+no+'. We moved it to a new day.\n'
+    +'New '+how.toLowerCase()+' date: '+longDate(n.d)+'\n'
     +'Total stays '+money(o.total)+'.'+track+'\nIf the new date doesn\'t work for you, just reply here. Thank you!';
   return 'Hi '+first+'! Your Culture Co. pre-order'+no+' is confirmed.\n'
-    +(batchName(n.b)||'Batch')+' ('+longDate(n.b)+')\n'
-    +(del?'Delivery':'Pickup')+': '+longDate(n.d)+'\n'
+    +how+': '+longDate(n.d)+'\n'
     +'Total: '+money(o.total)
     +track+'\nThank you!';
 }
@@ -2582,7 +2570,7 @@ function webCheck(o,bd){
   if(!bd)return '';
   var rows=stockRows(bd,webAdd(webLines(o)));
   var over=rows.filter(function(x){return x.add>0&&x.left<0;});
-  if(!rows.length)return '<p class="muted small">No stock set for this batch.</p>';
+  if(!rows.length)return '<p class="muted small">No stock set for this delivery day.</p>';
   return '<p class="small'+(over.length?' left0':' muted')+'">'+(over.length?'Over stock: ':'After approving: ')+rows.filter(function(x){return x.add>0;}).map(function(x){return esc(shortName(x.p.name))+' '+(x.left<0?'over by '+(-x.left):x.left+' left');}).join(' · ')+'</p>';
 }
 function renderWeb(){
@@ -2603,8 +2591,8 @@ function renderWeb(){
       +'<div class="olines">'+lines.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(qtyText(l))+' × '+esc(l.product)+esc(flavInline(l))+'</span><span>'+money(l.qty*l.price)+'</span></div>';}).join('')
       +(o.deliveryFee?'<div class="ol"><span>Delivery fee</span><span>'+money(o.deliveryFee)+'</span></div>':'')
       +'<div class="ol"><strong>Total</strong><strong>'+money(o.total)+'</strong></div></div>'
-      +'<p class="small"><b>Contact:</b> '+esc(o.contact)+(o.address?'<br><b>Address:</b> '+esc(o.address):'')+(o.notes?'<br><b>Notes:</b> '+esc(o.notes):'')+(pref?'<br><b>Prefers:</b> '+esc((batchName(pref)||'Batch')+' · '+dateLabel(pref)):'')+'</p>'
-      +'<div class="form"><div class="field"><label>Batch</label><select data-webb="'+esc(o.id)+'">'+batchOpts(bd)+'</select></div>'
+      +'<p class="small"><b>Contact:</b> '+esc(o.contact)+(o.address?'<br><b>Address:</b> '+esc(o.address):'')+(o.notes?'<br><b>Notes:</b> '+esc(o.notes):'')+(pref?'<br><b>Prefers:</b> '+esc(delivLabel(pref)):'')+'</p>'
+      +'<div class="form"><div class="field"><label>Delivery day</label><select data-webb="'+esc(o.id)+'">'+batchOpts(bd)+'</select></div>'
       +'<div class="field"><label>'+(o.fulfilment==='delivery'?'Delivery':'Pickup')+' date</label><input type="date" data-webd="'+esc(o.id)+'" value="'+esc(dd)+'"></div></div>'
       +webCheck(o,bd)
       +'<div class="actions"><button type="button" class="btn" data-act="webok" data-id="'+esc(o.id)+'">Approve</button><button type="button" class="btn danger" data-act="webno" data-id="'+esc(o.id)+'">'+(webDecline[o.id]?'Tap again to decline':'Decline')+'</button></div>'
@@ -2616,7 +2604,7 @@ function webField(id){var el=document.querySelector('[data-webb="'+id+'"]'),dd=d
 function approveWeb(id){
   var o=webOrders.find(function(x){return x.id===id;});if(!o)return;
   var f=webField(id);
-  if(!f.b){toast('Pick the batch for this order.');return;}
+  if(!f.b){toast('Pick the delivery day for this order.');return;}
   if(!f.d){toast('Pick the pickup or delivery date.');return;}
   var lines=webLines(o);
   if(!lines.length){toast('This order has no items.');return;}
