@@ -61,7 +61,7 @@ p{margin:0}
 .banner strong{font-weight:600}
 .banner .list{display:flex;flex-direction:column;gap:2px;min-width:0}
 
-.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(6,1fr);background:var(--surface);border-top:1px solid var(--line);
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);
   padding:4px max(6px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
 .nav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 1px 6px;font-size:10.5px;font-weight:600;color:var(--muted);border-radius:8px;position:relative;min-width:0}
 .nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -343,8 +343,8 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
   <nav class="nav" aria-label="Sections">
     <button type="button" data-tab="production" id="nav-production"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2.5h6"/></svg><span>Production</span><span class="badge" id="navBadge" hidden>0</span></button>
     <button type="button" data-tab="measure" id="nav-measure"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.5A1.5 1.5 0 0 0 5.8 21h12.4a1.5 1.5 0 0 0 1.3-2.5L14 9V3M7.5 15h9"/></svg><span>Measure</span></button>
-    <button type="button" data-tab="orders" id="nav-orders"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg><span>Orders</span></button>
-    <button type="button" data-tab="reserve" id="nav-reserve"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/></svg><span>Pre-orders</span><span class="badge" id="resBadge" hidden>0</span></button>
+    <button type="button" data-tab="orders" id="nav-orders" hidden><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg><span>Orders</span></button>
+    <button type="button" data-tab="reserve" id="nav-reserve"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/></svg><span>Orders</span><span class="badge" id="resBadge" hidden>0</span></button>
     <button type="button" data-tab="money" id="nav-money"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.4-.8-1.4-1.2-2.5-1.2-1.4 0-2.5.7-2.5 1.8 0 2.4 5 1.2 5 3.6 0 1.1-1.1 1.8-2.5 1.8-1.2 0-2.2-.5-2.6-1.3M12 6.5V8m0 8v1.5"/></svg><span>Money</span></button>
     <button type="button" data-tab="summary" id="nav-summary"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Summary</span></button>
   </nav>
@@ -513,6 +513,56 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <div id="dayList"></div>
     </div>
 
+  </section>
+
+  <!-- PRE-ORDERS -->
+  <section class="tab" id="tab-reserve" hidden>
+    <div class="card" id="webCard" hidden>
+      <div class="cardhead"><h2>Online orders</h2><span class="pill acc" id="webCount"></span></div>
+      <p class="muted small">New orders from your website. Check the date, then approve to add them to your orders and stock. The customer sees the date when they track their order.</p>
+      <div id="webNotes" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div id="webList" style="display:flex;flex-direction:column;gap:12px"></div>
+    </div>
+    <div class="tiles" id="resTiles"></div>
+
+    <div class="card">
+      <h2>New order</h2>
+      <form id="resForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
+        <div class="form">
+          <div class="field wide"><label for="rCustomer">Customer name</label><input id="rCustomer" data-combo="customers" maxlength="60" required></div>
+          <div class="field"><label for="rDate">Pickup or delivery day</label><select id="rDate" required></select><span class="muted small">Mon, Wed or Fri only</span></div>
+          <div class="field wide" hidden><label for="rBatch">Delivery day</label><select id="rBatch"></select></div>
+          <div class="field"><label for="rMode">Pickup or delivery</label><select id="rMode"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
+          <div class="field" id="rFeeWrap" hidden><label for="rFee">Delivery fee (<span class="cur">&#8369;</span>)</label><input id="rFee" type="number" min="0" step="any" inputmode="decimal"></div>
+          <div class="field wide"><label for="rNote">Remarks</label><input id="rNote" maxlength="200" placeholder="Delivery address, flavor, anything to remember"></div>
+        </div>
+        <div class="itemrow">
+          <span class="lbl">Items in this order</span>
+          <ul class="cart" id="rCart" hidden></ul>
+          <div class="form">
+            <div class="field wide"><label for="rProduct">Product</label><input id="rProduct" data-combo="products" placeholder="Greek Yogurt @ 350g" maxlength="60"></div>
+            <div class="field"><label for="rQty">Quantity</label><input id="rQty" type="number" min="1" step="1" value="1" inputmode="numeric"></div>
+            <div class="field"><label for="rPrice">Price each (<span class="cur">&#8369;</span>)</label><input id="rPrice" type="number" min="0" step="any" inputmode="decimal"><span class="muted small" id="rHint"></span></div>
+          </div>
+          <div class="flv" id="rFlv" hidden></div>
+          <div class="actions"><button type="button" class="btn quiet" data-act="radditem">Add another item</button></div>
+        </div>
+        <div id="rCheck" class="banner info"></div>
+        <div class="actions"><button class="btn" type="submit" id="rGo">Save order</button><span class="muted" id="rTotal"></span></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Orders</h2>
+      <div class="chips" id="resFilter" role="group" aria-label="Show">
+        <button type="button" class="chip" data-act="resfilter" data-f="upcoming">Waiting</button>
+        <button type="button" class="chip" data-act="resfilter" data-f="ordered">Done</button>
+        <button type="button" class="chip" data-act="resfilter" data-f="cancelled">Cancelled</button>
+        <button type="button" class="chip" data-act="resfilter" data-f="all">All</button>
+      </div>
+      <div id="resList"></div>
+    </div>
+
     <div class="card" id="packCard">
       <div class="cardhead"><h2>Packing list</h2><button type="button" class="btn small quiet" data-act="packcopy">Copy list</button></div>
       <div class="cardhead">
@@ -526,55 +576,6 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <p class="muted small" id="packProg"></p>
       <div class="ptot" id="packTotals"></div>
       <div id="packList"></div>
-    </div>
-  </section>
-
-  <!-- PRE-ORDERS -->
-  <section class="tab" id="tab-reserve" hidden>
-    <div class="card" id="webCard" hidden>
-      <div class="cardhead"><h2>Online orders</h2><span class="pill acc" id="webCount"></span></div>
-      <p class="muted small">New pre-orders from your website. Pick the delivery day and date, then approve to add them to your pre-orders and stock. The customer sees the delivery day and date when they track their order.</p>
-      <div id="webNotes" style="display:flex;flex-direction:column;gap:10px"></div>
-      <div id="webList" style="display:flex;flex-direction:column;gap:12px"></div>
-    </div>
-    <div class="tiles" id="resTiles"></div>
-
-    <div class="card">
-      <h2>New pre-order</h2>
-      <form id="resForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
-        <div class="form">
-          <div class="field wide"><label for="rCustomer">Customer name</label><input id="rCustomer" data-combo="customers" maxlength="60" required></div>
-          <div class="field"><label for="rDate">Pickup or delivery day</label><select id="rDate" required></select><span class="muted small">Mon, Wed or Fri only</span></div>
-          <div class="field wide" hidden><label for="rBatch">Delivery day</label><select id="rBatch"></select></div>
-          <div class="field"><label for="rMode">Pickup or delivery</label><select id="rMode"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
-          <div class="field" id="rFeeWrap" hidden><label for="rFee">Delivery fee (<span class="cur">&#8369;</span>)</label><input id="rFee" type="number" min="0" step="any" inputmode="decimal"></div>
-          <div class="field wide"><label for="rNote">Remarks</label><input id="rNote" maxlength="200" placeholder="Delivery address, flavor, anything to remember"></div>
-        </div>
-        <div class="itemrow">
-          <span class="lbl">Items in this pre-order</span>
-          <ul class="cart" id="rCart" hidden></ul>
-          <div class="form">
-            <div class="field wide"><label for="rProduct">Product</label><input id="rProduct" data-combo="products" placeholder="Greek Yogurt @ 350g" maxlength="60"></div>
-            <div class="field"><label for="rQty">Quantity</label><input id="rQty" type="number" min="1" step="1" value="1" inputmode="numeric"></div>
-            <div class="field"><label for="rPrice">Price each (<span class="cur">&#8369;</span>)</label><input id="rPrice" type="number" min="0" step="any" inputmode="decimal"><span class="muted small" id="rHint"></span></div>
-          </div>
-          <div class="flv" id="rFlv" hidden></div>
-          <div class="actions"><button type="button" class="btn quiet" data-act="radditem">Add another item</button></div>
-        </div>
-        <div id="rCheck" class="banner info"></div>
-        <div class="actions"><button class="btn" type="submit" id="rGo">Reserve</button><span class="muted" id="rTotal"></span></div>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Pre-orders</h2>
-      <div class="chips" id="resFilter" role="group" aria-label="Show">
-        <button type="button" class="chip" data-act="resfilter" data-f="upcoming">Waiting</button>
-        <button type="button" class="chip" data-act="resfilter" data-f="ordered">Ordered</button>
-        <button type="button" class="chip" data-act="resfilter" data-f="cancelled">Cancelled</button>
-        <button type="button" class="chip" data-act="resfilter" data-f="all">All</button>
-      </div>
-      <div id="resList"></div>
     </div>
 
     <div class="card">
@@ -955,7 +956,7 @@ function renderBanners(){
   var today2=ymd(new Date()),rdue=rEntries(mem.reservations.filter(function(r){return r.status==='reserved'&&r.date<=today2;})).map(function(g){return g.lines[0];}),rb=$('resBanner');
   if(rdue.length){
     rb.hidden=false;
-    rb.innerHTML='<span><strong>'+rdue.length+(rdue.length===1?' pre-order is':' pre-orders are')+' due today or late.</strong> <span class="muted">'+rdue.slice(0,3).map(function(r){return esc(r.customer);}).join(', ')+(rdue.length>3?' and more':'')+'</span></span><button type="button" class="btn small" data-tab="reserve">Open pre-orders</button>';
+    rb.innerHTML='<span><strong>'+rdue.length+(rdue.length===1?' order is':' orders are')+' due today or late.</strong> <span class="muted">'+rdue.slice(0,3).map(function(r){return esc(r.customer);}).join(', ')+(rdue.length>3?' and more':'')+'</span></span><button type="button" class="btn small" data-tab="reserve">Open pre-orders</button>';
   }else{rb.hidden=true;rb.innerHTML='';}
   var anySample=mem.orders.concat(mem.expenses).some(function(x){return x.sample;});
   $('sampleBanner').hidden=!anySample;
@@ -1503,7 +1504,7 @@ function renderPack(){
   var lines=packLines(packDay),t=S.packTicks[packDay]||[];
   if(!lines.length){
     $('packTotals').innerHTML='';
-    $('packList').innerHTML=emptyBox('Nothing to pack for '+dateLabel(packDay).toLowerCase()+'. Orders and waiting pre-orders with this date show up here.');
+    $('packList').innerHTML=emptyBox('Nothing to pack for '+dateLabel(packDay).toLowerCase()+'. Orders for this date show up here.');
     packProg();return;
   }
   var tot={},order=[];lines.forEach(function(l){if(tot[l.product]===undefined){tot[l.product]=0;order.push(l.product);}tot[l.product]+=piecesOf(l);});
@@ -1671,6 +1672,14 @@ function flvNew(px){
   renderAll();
   toast(ex?nm+' selected.':'Added '+nm+' to your flavors.');
 }
+/* same product (and flavor) adds to the existing line instead of a new one */
+function lineKey(l){return String(l.product||'').trim().toLowerCase()+'|'+num(l.price)+(Number(l.pack)>1?'|set':'|'+Object.keys(l.flavors||{}).sort().join(','));}
+function mergeFlav(a,b){var o=Object.assign({},a||{});Object.keys(b||{}).forEach(function(k){o[k]=(o[k]||0)+b[k];});return Object.keys(o).length?o:undefined;}
+function addLine(list,it){
+  var k=lineKey(it),ex=list.find(function(x){return !x.fee&&lineKey(x)===k;});
+  if(ex){ex.qty=num(ex.qty)+num(it.qty);if(it.flavors||ex.flavors)ex.flavors=mergeFlav(ex.flavors,it.flavors);return ex;}
+  list.push(it);return it;
+}
 function itemFrom(px,prodId,qtyId,priceId){
   var prod=$(prodId).value.trim(),q=Math.round(num($(qtyId).value)),pr=$(priceId).value;
   if(!(prod&&q>0&&pr!==''))return null;
@@ -1814,13 +1823,13 @@ function autoBatch(){
 }
 var rcart=[];
 function curResItem(){return itemFrom('r','rProduct','rQty','rPrice');}
-function resItems(){var it=curResItem();return rcart.concat(it?[it]:[]);}
+function resItems(){var out=rcart.map(function(l){return Object.assign({},l,{flavors:l.flavors?Object.assign({},l.flavors):undefined});}),it=curResItem();if(it)addLine(out,it);return out;}
 function updateResCheck(){
   var box=$('rCheck'),bdate=$('rDate').value,pickup=$('rDate').value,items=resItems();
   var tot=sum(items,function(l){return l.qty*l.price;}),n=items.length;
   var rfee=feeFor('r')||0;tot+=n>0?rfee:0;
-  $('rTotal').textContent=n===0?'':(n===1?'Total ':'Pre-order total, '+n+' items: ')+money(tot)+(n>0&&rfee>0?' (includes '+money(rfee)+' delivery)':'');
-  $('rGo').textContent=overConfirm?'Over the limit. Reserve anyway':(n>1?'Reserve ('+n+' items)':'Reserve');
+  $('rTotal').textContent=n===0?'':(n===1?'Total ':'Order total, '+n+' items: ')+money(tot)+(n>0&&rfee>0?' (includes '+money(rfee)+' delivery)':'');
+  $('rGo').textContent=overConfirm?'Not enough. Save anyway':(n>1?'Save order ('+n+' items)':'Save order');
   var info=function(h){box.className='banner info';box.innerHTML=h;};
   if(!n){info('<span class="muted">Pick a product and quantity to see how much is left for that delivery day.</span>');return null;}
   if(!bdate){info('<span>Pick the pickup or delivery date to check what is left.</span>');return {over:false};}
@@ -1844,7 +1853,7 @@ function renderResCart(){
 function addResItem(){
   var it=curResItem();
   if(!it){toast(flavMissing('r')||'Fill in product, quantity and price, then add it.');return;}
-  rcart.push(it);overConfirm=false;$('rProduct').value='';$('rQty').value=1;$('rPrice').value='';FL.r={};renderFlv('r');updateHints();renderResCart();$('rProduct').focus();
+  addLine(rcart,it);overConfirm=false;$('rProduct').value='';$('rQty').value=1;$('rPrice').value='';FL.r={};renderFlv('r');updateHints();renderResCart();$('rProduct').focus();
 }
 function rKey(r){return r.group||r.id;}
 function rLines(key){return mem.reservations.filter(function(r){return rKey(r)===key;}).sort(function(a,b){return (a.created||0)-(b.created||0);});}
@@ -1856,7 +1865,7 @@ function rEntries(list){
 }
 var resAdd=null,raConfirm=false,resMove=null,resMoveSel={},resCancelArm={};
 function addFormHtml(key){
-  return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Add an item to this pre-order</span><div class="form">'
+  return '<div class="itemrow" style="margin-top:8px"><span class="lbl">Add an item to this order</span><div class="form">'
     +'<div class="field wide"><label for="raP">Product</label><input id="raP" data-combo="products" maxlength="60" placeholder="Greek Yogurt @ 350g"></div>'
     +'<div class="field"><label for="raQ">Quantity</label><input id="raQ" type="number" min="1" step="1" value="1" inputmode="numeric"></div>'
     +'<div class="field"><label for="raPr">Price each</label><input id="raPr" type="number" min="0" step="any" inputmode="decimal"><span class="muted small" id="raHint"></span></div></div>'
@@ -1865,9 +1874,11 @@ function addFormHtml(key){
 function resRow(g){
   var items=g.lines.filter(notFee),feeL=g.lines.find(isFee),r=items[0]||g.lines[0],key=g.key,nl=items.length,today=ymd(new Date()),total=sum(g.lines,function(l){return l.qty*l.price;}),pill,btns,chk,bd=batchDateOf(r);
   if(r.status==='converted'){
-    pill='<span class="pill good">Ordered</span>';
+    pill='<span class="pill good">Done</span>';
     chk='<button type="button" class="check" aria-pressed="true" disabled aria-label="Ordered"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>';
-    btns='<button type="button" class="btn small quiet" data-act="rundo" data-id="'+esc(key)+'">Undo</button>';
+    var ords=g.lines.map(function(l){return mem.orders.find(function(o){return o.id===l.orderId;});}).filter(Boolean),isPaid=ords.length&&ords.every(function(o){return o.paid;});
+    if(ords.length)pill+=isPaid?' <span class="pill good">Paid</span>':' <span class="pill warn">Unpaid</span>';
+    btns=(ords.length?'<button type="button" class="btn small '+(isPaid?'quiet':'')+'" data-act="rpaid" data-id="'+esc(key)+'">'+(isPaid?'Mark unpaid':'Mark paid')+'</button>':'')+'<button type="button" class="btn small quiet" data-act="rundo" data-id="'+esc(key)+'">Undo</button>';
   }else if(r.status==='cancelled'){
     pill='<span class="pill">Cancelled</span>';
     chk='<button type="button" class="check" aria-pressed="false" disabled aria-label="Cancelled"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>';
@@ -1886,13 +1897,13 @@ function resRow(g){
 }
 function renderReserve(){
   var today=ymd(new Date()),open=rEntries(mem.reservations.filter(function(r){return r.status==='reserved';})),due=open.filter(function(g){return g.lines[0].date<=today;});
-  $('resTiles').innerHTML=tile(open.length,'Pre-orders waiting')+tile(money(sum(open,function(g){return sum(g.lines,function(l){return l.qty*l.price;});})),'Value waiting')+tile(due.length,'Due today or late',due.length?'neg':'');
+  $('resTiles').innerHTML=tile(open.length,'Orders waiting')+tile(money(sum(open,function(g){return sum(g.lines,function(l){return l.qty*l.price;});})),'Value waiting')+tile(due.length,'Due today or late',due.length?'neg':'');
   var rb=$('resBadge');rb.textContent=due.length;rb.hidden=!due.length;
   document.querySelectorAll('#resFilter .chip').forEach(function(c){c.setAttribute('aria-pressed',c.dataset.f===resFilter);});
   fillResDates();
   var shown=rEntries(mem.reservations).filter(function(g){var r=g.lines[0];return resFilter==='all'||(resFilter==='upcoming'&&r.status==='reserved')||(resFilter==='ordered'&&r.status==='converted')||(resFilter==='cancelled'&&r.status==='cancelled');});
   if(!shown.length){
-    $('resList').innerHTML=emptyBox(resFilter==='upcoming'?'No pre-orders waiting. Add one above, or wait for orders from your website.':'Nothing here yet.');
+    $('resList').innerHTML=emptyBox(resFilter==='upcoming'?'No orders waiting. Add one above, or wait for orders from your website.':'Nothing here yet.');
   }else{
     var groups={};shown.forEach(function(g){var k=batchDateOf(g.lines[0]);(groups[k]||(groups[k]=[])).push(g);});
     var asc=resFilter==='upcoming',keys=Object.keys(groups).sort(function(a,b){if(a===''||b==='')return a===''?1:-1;return (a<b)===asc?-1:1;}),slides=[];
@@ -1962,7 +1973,7 @@ function convertRes(key){
     chain=chain.then(function(){return put('orders',{id:oid,group:g||undefined,date:l.date,customer:l.customer,product:l.product,qty:l.qty,price:l.price,pack:l.pack,flavors:l.flavors,fee:l.fee,delivery:l.delivery,paid:false,note:l.note||'',created:base+i,fromReservation:key,batch:bn},true);})
       .then(function(){return put('reservations',Object.assign({},l,{status:'converted',orderId:oid}),true);});
   });
-  chain.then(function(){renderAll();toast('Moved to Orders for '+dateLabel(r.date).toLowerCase());});
+  chain.then(function(){renderAll();toast('Marked done. It counts in your sales for '+dateLabel(r.date).toLowerCase()+'.');});
 }
 function undoRes(key){
   var lines=rLines(key).filter(function(x){return x.status==='converted';});if(!lines.length)return;
@@ -1984,16 +1995,18 @@ function addToRes(key){
   if(!it){toast(flavMissing('ra')||'Fill in product, quantity and price.');return;}
   var prod=it.product,q=it.qty,pr=String(it.price);
   var r=lines[0],bd=batchDateOf(r);
-  if(bd&&(GREEK.test(prod)||prodInfo(prod))){
-    var after=usedOn(bd)+batchesFor(prod,piecesOf(it),bd);
-    if(after>capFor(bd)+0.001&&!raConfirm){raConfirm=true;$('raGo').textContent='Over the limit. Add anyway';toast('This brings '+(batchName(bd)||'the batch')+' over its limit. Tap again to add anyway.');return;}
+  if(bd&&!raConfirm){
+    var am={};am[prodKey(prod)]=piecesOf(it);
+    if(stockRows(bd,am).some(function(x){return x.add>0&&x.left<0;})){raConfirm=true;$('raGo').textContent='Not enough. Add anyway';toast('Not enough left for '+dateLabel(bd).toLowerCase()+'. Tap again to add anyway.');return;}
   }
   var g=r.group||r.id,last=lines[lines.length-1];
+  var exl=lines.find(function(l){return l.status==='reserved'&&!l.fee&&lineKey(l)===lineKey(it);});
+  if(exl){put('reservations',Object.assign({},exl,{qty:num(exl.qty)+q,flavors:(it.flavors||exl.flavors)?mergeFlav(exl.flavors,it.flavors):undefined}),true);resAdd=null;raConfirm=false;renderAll();toast('Added '+q+' more '+prod+' to '+r.customer+'\'s order');return;}
   var chain=Promise.resolve();
   if(!r.group)chain=put('reservations',Object.assign({},r,{group:g}),true);
   chain.then(function(){
     return put('reservations',{id:uid(),group:g,date:r.date,batchDate:r.batchDate===undefined?undefined:r.batchDate,customer:r.customer,product:prod,qty:q,price:num(pr),pack:it.pack,flavors:it.flavors,note:r.note||'',status:'reserved',created:Math.max(Date.now(),(last.created||0)+1)},true);
-  }).then(function(){resAdd=null;raConfirm=false;renderAll();toast('Added '+prod+' to '+r.customer+'\'s pre-order');});
+  }).then(function(){resAdd=null;raConfirm=false;renderAll();toast('Added '+prod+' to '+r.customer+'\'s order');});
 }
 function setResBatch(key,v){
   var chain=Promise.resolve();
@@ -2068,6 +2081,7 @@ function exportReservations(){
 /* ---------- tabs ---------- */
 var TABS=['production','measure','orders','reserve','money','summary'];
 function show(tab){
+  if(tab==='orders')tab='reserve';
   if(TABS.indexOf(tab)<0)tab='production';
   activeTab=tab;
   TABS.forEach(function(t){$('tab-'+t).hidden=t!==tab;var b=$('nav-'+t);if(t===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
@@ -2100,6 +2114,11 @@ function clearSample(){
 
 /* ---------- events ---------- */
 function linesOf(key){return mem.orders.filter(function(o){return orderKey(o)===key;});}
+function resPaid(key){
+  var ords=rLines(key).map(function(l){return mem.orders.find(function(o){return o.id===l.orderId;});}).filter(Boolean);if(!ords.length)return;
+  var np=!ords.every(function(o){return o.paid;});
+  ords.forEach(function(o){put('orders',Object.assign({},o,{paid:np}),true);});renderAll();toast(np?'Marked paid.':'Marked unpaid.');
+}
 function payGroup(key){
   var lines=linesOf(key);if(!lines.length)return;
   var np=!lines.every(function(l){return l.paid;}),chain=Promise.resolve();
@@ -2177,6 +2196,7 @@ document.addEventListener('click',function(e){
   else if(a==='rconvert')convertRes(id);
   else if(a==='rundo')undoRes(id);
   else if(a==='rcancel')cancelRes(id);
+  else if(a==='rpaid')resPaid(id);
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
@@ -2374,19 +2394,28 @@ $('resForm').addEventListener('submit',function(e){
   if($('rProduct').value.trim()&&$('rPrice').value!==''&&!curResItem()){toast(flavMissing('r')||'Finish the item you are typing: product, quantity and price.');return;}
   if(!cust||!date||!items.length){toast('Fill in customer, date, and at least one item with quantity and price.');return;}
   var chk=updateResCheck();
-  if(chk&&chk.over&&!overConfirm){overConfirm=true;updateResCheck();toast('Not enough for that day. Tap again to reserve anyway.');return;}
-  var rf=feeFor('r'),rdel=rf!==null,g=(items.length>1||(rdel&&rf>0))?uid():null,base=Date.now(),bd=date,note=$('rNote').value.trim(),chain=Promise.resolve();
-  items.forEach(function(it,i){
-    chain=chain.then(function(){return put('reservations',{id:uid(),group:g||undefined,date:date,batchDate:bd,customer:cust,product:it.product,qty:it.qty,price:it.price,pack:it.pack,flavors:it.flavors,delivery:rdel||undefined,note:note,status:'reserved',created:base+i},true);});
-  });
-  if(rdel&&rf>0)chain=chain.then(function(){return put('reservations',{id:uid(),group:g,date:date,batchDate:bd,customer:cust,product:'Delivery fee',qty:1,price:rf,fee:true,delivery:true,note:note,status:'reserved',created:base+items.length},true);});
-  chain.then(function(){
-    $('rMode').value='pickup';$('rFee').value='';
-    rcart=[];overConfirm=false;batchManual=false;
-    $('rCustomer').value='';$('rNote').value='';$('rProduct').value='';$('rQty').value=1;$('rPrice').value='';FL.r={};renderFlv('r');
-    updateHints();renderAll();renderResCart();
-    toast('Pre-order reserved for '+dateLabel(date).toLowerCase());
-  });
+  if(chk&&chk.over&&!overConfirm){overConfirm=true;updateResCheck();toast('Not enough for that day. Tap again to save anyway.');return;}
+  var rf=feeFor('r'),rdel=rf!==null,base=Date.now(),note=$('rNote').value.trim();
+  var same=rEntries(mem.reservations.filter(function(r){return r.status==='reserved'&&r.date===date&&String(r.customer||'').trim().toLowerCase()===cust.toLowerCase();}))[0];
+  if(same){
+    var lines=same.lines.slice(),g0=same.key,last=Math.max.apply(null,lines.map(function(l){return l.created||0;}).concat([base]));
+    lines.forEach(function(l){if(l.group!==g0)put('reservations',Object.assign({},l,{group:g0}),true);});
+    items.forEach(function(it,i){
+      var k=lineKey(it),ex=lines.find(function(l){return !l.fee&&lineKey(l)===k;});
+      if(ex){var up=Object.assign({},ex,{group:g0,qty:num(ex.qty)+it.qty,flavors:(it.flavors||ex.flavors)?mergeFlav(ex.flavors,it.flavors):undefined});put('reservations',up,true);ex.qty=up.qty;ex.flavors=up.flavors;}
+      else{var nl={id:uid(),group:g0,date:date,batchDate:date,customer:same.lines[0].customer,product:it.product,qty:it.qty,price:it.price,pack:it.pack,flavors:it.flavors,delivery:(rdel||same.lines.some(function(l){return l.delivery;}))||undefined,note:same.lines[0].note||note,status:'reserved',created:last+1+i};put('reservations',nl,true);lines.push(nl);}
+    });
+    if(rdel&&rf>0&&!lines.some(function(l){return l.fee;}))put('reservations',{id:uid(),group:g0,date:date,batchDate:date,customer:same.lines[0].customer,product:'Delivery fee',qty:1,price:rf,fee:true,delivery:true,note:same.lines[0].note||note,status:'reserved',created:last+items.length+2},true);
+  }else{
+    var g=(items.length>1||(rdel&&rf>0))?uid():null;
+    items.forEach(function(it,i){put('reservations',{id:uid(),group:g||undefined,date:date,batchDate:date,customer:cust,product:it.product,qty:it.qty,price:it.price,pack:it.pack,flavors:it.flavors,delivery:rdel||undefined,note:note,status:'reserved',created:base+i},true);});
+    if(rdel&&rf>0)put('reservations',{id:uid(),group:g,date:date,batchDate:date,customer:cust,product:'Delivery fee',qty:1,price:rf,fee:true,delivery:true,note:note,status:'reserved',created:base+items.length},true);
+  }
+  $('rMode').value='pickup';$('rFee').value='';
+  rcart=[];overConfirm=false;batchManual=false;
+  $('rCustomer').value='';$('rNote').value='';$('rProduct').value='';$('rQty').value=1;$('rPrice').value='';FL.r={};renderFlv('r');
+  updateHints();renderAll();renderResCart();
+  toast(same?'Added to '+same.lines[0].customer+'\'s order for '+dateLabel(date).toLowerCase():'Order saved for '+dateLabel(date).toLowerCase());
 });
 $('oProduct').addEventListener('input',updateHints);
 $('oProduct').addEventListener('input',updateOrderTotal);
@@ -2600,8 +2629,8 @@ function webListen(){
     if(fresh.length){
       webBeep();
       var o=webOrders.find(function(x){return x.id===fresh[0];});
-      toast('New online pre-order'+(o?' from '+o.name:''));
-      if(o)deskNotify('New online pre-order #'+o.queueNumber,o.name+' · '+money(o.total),'web-'+o.id);
+      toast('New online order'+(o?' from '+o.name:''));
+      if(o)deskNotify('New online order #'+o.queueNumber,o.name+' · '+money(o.total),'web-'+o.id);
     }
   },function(e){$('webList').innerHTML=emptyBox('Online orders could not load ('+esc(e.code||'error')+'). Check that you are signed in with the shop account.');});
 }
