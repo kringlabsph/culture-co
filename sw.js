@@ -1,11 +1,12 @@
 // Culture Co. Desk service worker: lets Desk open with no signal and shows notifications.
 // When you change desk.html, bump VERSION (v2, v3...) so phones pick up the new copy.
-const VERSION = 'cc-desk-v13';
+const VERSION = 'cc-desk-v14';
 
 const SHELL = [
   'desk.html',
   'desk.webmanifest',
   'img/icon-192.png',
+  'img/favicon-32.png',
   'img/icon-512.png',
   'img/mark.png',
   'img/logo.png',
