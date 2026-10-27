@@ -256,7 +256,9 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 .cart .cm span{overflow-wrap:anywhere}
 .olines{display:flex;flex-direction:column;gap:3px;margin-top:3px}
 .olines .ol{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}
-.olines .ol span:first-child{overflow-wrap:anywhere}
+.olines .ol span:first-child{overflow-wrap:anywhere;flex:1 1 auto;min-width:0}
+.olines .ol>span:last-child{flex:0 0 auto}
+.resgroup .list .main{min-width:0}
 .olines .ol span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
 @media (max-width:520px){
   #dayList .list>li{flex-wrap:wrap;align-items:flex-start}
@@ -1901,9 +1903,29 @@ function resRow(g){
   body+=feeRow(feeL);
   var addBtn=r.status==='reserved'?(resAdd===key?addFormHtml(key):'<div><button type="button" class="btn small quiet" style="margin-top:4px" data-act="raddopen" data-id="'+esc(key)+'">+ Add item</button></div>'):'';
   var note=(g.lines.find(function(l){return l.note;})||{}).note;
-  return '<li>'+chk+'<div class="main grow"><strong>'+esc(r.customer)+' '+pill+(nl>1?' <span class="pill">'+nl+' items</span>':'')+delPill(g.lines)+'</strong>'+body+'<span class="muted small">Pickup '+esc(dateLabel(r.date))+'</span>'+(note?'<span class="remark">'+esc(note)+'</span>':'')+pick+addBtn+'</div><div class="side"><span class="amt">'+money(total)+'</span>'+btns+'</div></li>';
+  return '<li>'+chk+'<div class="main grow"><strong>'+esc(r.customer)+' '+pill+(nl>1?' <span class="pill">'+nl+' items</span>':'')+delPill(g.lines)+'</strong>'+body+'<span class="muted small">'+(g.lines.some(function(l){return l.delivery;})?'Delivery ':'Pickup ')+esc(dateLabel(r.date))+'</span>'+(note?'<span class="remark">'+esc(note)+'</span>':'')+pick+addBtn+'</div><div class="side"><span class="amt">'+money(total)+'</span>'+btns+'</div></li>';
+}
+/* combine repeated items inside one waiting order (e.g. Greek x9 and Greek x2 -> Greek x11) */
+var consBusy=false;
+function consolidateOrders(){
+  if(consBusy)return false;
+  var changed=false;
+  rEntries(mem.reservations.filter(function(r){return r.status==='reserved';})).forEach(function(g){
+    var seen={};
+    g.lines.forEach(function(l){
+      if(l.fee)return;
+      var k=lineKey(l);
+      if(!seen[k]){seen[k]=Object.assign({},l);return;}
+      var keep=seen[k];keep.qty=num(keep.qty)+num(l.qty);if(keep.flavors||l.flavors)keep.flavors=mergeFlav(keep.flavors,l.flavors);
+      keep._dirty=true;keep._drop=(keep._drop||[]).concat([l.id]);changed=true;
+    });
+    Object.keys(seen).forEach(function(k){var keep=seen[k];if(!keep._dirty)return;var drop=keep._drop;delete keep._dirty;delete keep._drop;
+      consBusy=true;put('reservations',keep,true);drop.forEach(function(id){del('reservations',id,true);});consBusy=false;});
+  });
+  return changed;
 }
 function renderReserve(){
+  if(consolidateOrders()){setTimeout(renderAll,0);}
   var today=ymd(new Date()),open=rEntries(mem.reservations.filter(function(r){return r.status==='reserved';})),due=open.filter(function(g){return g.lines[0].date<=today;});
   $('resTiles').innerHTML=tile(open.length,'Orders waiting')+tile(money(sum(open,function(g){return sum(g.lines,function(l){return l.qty*l.price;});})),'Value waiting')+tile(due.length,'Due today or late',due.length?'neg':'');
   var rb=$('resBadge');rb.textContent=due.length;rb.hidden=!due.length;
