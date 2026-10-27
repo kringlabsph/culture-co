@@ -114,6 +114,9 @@ section{padding:110px 0}
 .batches{background:var(--paper);padding:48px 0;border-block:1px solid var(--line)}
 .batches .wrap{display:grid;grid-template-columns:280px 1fr;gap:40px;align-items:center}
 .batches h2{font-size:34px}
+.preonly{display:inline-block;margin:10px 0 0;padding:5px 12px;border-radius:999px;background:var(--forest);color:var(--milk)!important;font-size:13px!important;font-weight:700;letter-spacing:.02em}
+.daysel{width:100%;padding:14px 44px 14px 16px;border:1.5px solid var(--line);border-radius:16px;background:var(--milk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%232f4a2c' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 16px center;color:var(--ink);font:600 16px var(--sans);-webkit-appearance:none;appearance:none;cursor:pointer}
+.daysel:focus{outline:none;border-color:var(--forest)}
 .batches p{color:var(--ink-2);font-size:15px;margin-top:6px}
 .days{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .day{background:var(--milk);border:1.5px solid var(--line);border-radius:22px;padding:18px 20px;display:flex;align-items:center;gap:16px;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s var(--ease)}
@@ -336,7 +339,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
   <!-- BATCHES -->
   <div class="batches" aria-labelledby="batchTitle">
     <div class="wrap">
-      <div><h2 id="batchTitle">Next delivery days</h2><p id="boardNote">Tap a day to see what's left for it.</p></div>
+      <div><h2 id="batchTitle">Next delivery days</h2><p class="preonly">Pre-order only · Mon, Wed &amp; Fri</p><p id="boardNote">Tap a day to see what's left for it.</p></div>
       <div class="days" id="days" aria-live="polite" role="group" aria-label="Choose a delivery day"></div>
     </div>
   </div>
@@ -372,7 +375,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
     <div class="wrap">
       <div class="sec-head rv"><div><h2 id="howTitle">How pre-orders work</h2><p class="lead">We only make what's ordered, so every tub and bottle is fresh.</p></div></div>
       <ol class="steps">
-        <li class="rv"><h3>Pre-order online</h3><p>Pick your flavors and the day you'd like, then pickup or delivery. You get a queue number and an order code right away.</p></li>
+        <li class="rv"><h3>Pre-order online</h3><p>Everything is pre-order. Pick your flavors and a Monday, Wednesday or Friday, then pickup or delivery. You get a queue number and an order code right away.</p></li>
         <li class="rv d-1"><h3>We confirm your date</h3><p>We deliver every Monday, Wednesday and Friday. We check what's left and confirm your date. Track it anytime with your code.</p></li>
         <li class="rv d-2"><h3>Pickup or delivery</h3><p>We'll let you know when it's ready. Delivery adds ₱20, and pickup is free.</p></li>
       </ol>
@@ -418,7 +421,10 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
         </div>
         <div class="panel summary">
           <h3>Summary</h3>
-          <p class="pref">Delivery day: <b id="prefBatch">—</b> · <a href="#days">change</a></p>
+          <label for="daySel" style="margin-top:0">Delivery or pickup day</label>
+          <select id="daySel" class="daysel"></select>
+          <p class="note" style="margin:6px 0 14px">Everything is pre-order. We deliver and hand over pickups on Monday, Wednesday and Friday only.</p>
+          <b id="prefBatch" hidden></b>
           <div id="lines"></div>
           <button class="btn" id="submit" style="width:100%;margin-top:22px" disabled>Continue</button>
           <div class="err" id="oErr" role="alert"></div>
@@ -508,7 +514,7 @@ const SITE = {
     "Culture Co. makes cultured yogurt, cultured milk drinks and Greek yogurt in plain, strawberry and blueberry.",
     "We make small batches every day for what's already pre-ordered, so it reaches you fresh."
   ],
-  marquee: ["Naturally cultured", "Naturally good", "Delivered Mon, Wed and Fri", "Plain, strawberry and blueberry", "Pre-order your slot"],
+  marquee: ["Naturally cultured", "Naturally good", "Delivered Mon, Wed and Fri", "Plain, strawberry and blueberry", "Pre-order only"],
 
   messengerLink: "https://m.me/7631346350237664",       // opens a chat with Culture Co. in the Messenger app (phone) or messenger.com (computer)
   facebookLink: "https://www.facebook.com/kristy.delapena.1",        // e.g. "https://facebook.com/yourpage"
@@ -524,6 +530,7 @@ const SITE = {
     ["How much is delivery?", "Delivery adds ₱20 to your order. Pickup is free."],
     ["How do the sets of 3 work?", "Drinks and minis come in sets of 3 for ₱100. Mix any flavors in a set, for example 2 strawberry and 1 blueberry."],
     ["How do I store it?", "Keep refrigerated. Do not freeze."],
+    ["Can I get my order on another day?", "We only deliver and hand over pickups on Monday, Wednesday and Friday, and everything is pre-order. If something comes up on our side, we'll message you and move your order to the next day that works."],
     ["What if a day is sold out?", "Pick another day, or send your order anyway and we'll suggest the next day with room."]
   ]
 };
@@ -647,7 +654,8 @@ function renderContent(){
 function renderBatches(){
   const list = batches().slice(0, 3);
   if (!list.length){ $("days").innerHTML = `<p class="empty">New delivery days will be posted soon.</p>`; return; }
-  if (!list.some(b => b.date === selBatch)) selBatch = (list.find(b => Object.values(b.left || {}).some(v => v > 0) || !Object.keys(b.left || {}).length) || list[0]).date;
+  const all = batches().slice(0, 6);
+  if (!all.some(b => b.date === selBatch)) selBatch = (list.find(b => Object.values(b.left || {}).some(v => v > 0) || !Object.keys(b.left || {}).length) || list[0]).date;
   $("days").innerHTML = list.map(b => {
     const rows = shop.products.filter(p => b.left && typeof b.left[p.name] === "number");
     const total = rows.reduce((a,p) => a + b.left[p.name], 0);
@@ -657,16 +665,22 @@ function renderBatches(){
       <div class="left">${!rows.length ? "Open for pre-orders" : full ? "Sold out" : rows.map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name]}</b></span>`).join("")}</div></div>
     </button>`;
   }).join("");
-  $("boardNote").textContent = "Tap a day to see what's left for it. We confirm your delivery date after you order.";
+  $("boardNote").textContent = "Everything is made to order. Tap a day to see what's left for it.";
   $("prefBatch").textContent = selBatch ? fmtShort(selBatch) : "—";
+  const ds = $("daySel");
+  if (document.activeElement !== ds){
+    ds.innerHTML = all.map(b => `<option value="${b.date}">${esc(fmtDay(b.date) + ", " + fmtDate(b.date))}</option>`).join("");
+    ds.value = selBatch;
+  }
 }
-$("days").addEventListener("click", e => {
-  const b = e.target.closest("button[data-date]"); if (!b) return;
-  selBatch = b.dataset.date;
+function pickDay(d){
+  selBatch = d;
   // trim the cart to what's left for this day
   shop.products.forEach((p, i) => { let over = usedOf(i) - leftFor(p); if (over > 0) for (const k of Object.keys(cart).filter(k => k === "p"+i || k.startsWith("p"+i+"|")).reverse()){ const t = Math.min(cart[k], over); cart[k] -= t; over -= t; } });
   renderBatches(); renderMenu(); update();
-});
+}
+$("days").addEventListener("click", e => { const b = e.target.closest("button[data-date]"); if (b) pickDay(b.dataset.date); });
+$("daySel").addEventListener("change", e => { pickDay(e.target.value); e.target.blur(); });
 
 /* ---------- menu ---------- */
 function stepper(key, label, val, canAdd){
