@@ -127,6 +127,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .cslide.one{border:1px solid var(--line);border-radius:16px;padding:2px 14px;background:var(--bg)}
 .cslide.one>.list>li{border-bottom:0}
 .cslide>.resgroup{margin-top:0}
+.cslide>.caprow{border-top:0}
 .bnav{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 2px}
 .bnav[hidden]{display:none}
 .bnav .arw{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:20px;line-height:1;display:grid;place-items:center;cursor:pointer}
@@ -1046,7 +1047,7 @@ var runId=null,runScrollT=null;
 function runIdx(){var t=$('btrack');if(!t||!t.children.length)return 0;var w=t.children[0].getBoundingClientRect().width+12;return Math.max(0,Math.min(t.children.length-1,Math.round(t.scrollLeft/w)));}
 function runCurId(){return runId;}
 function runSync(){
-  var t=$('btrack');if(!t)return;var i=runIdx(),n=t.children.length;
+  var t=$('btrack');if(!t||!t.offsetParent)return;var i=runIdx(),n=t.children.length;
   var a=t.children[i];if(a&&a.dataset.bid)runId=a.dataset.bid;if(a)fitTrack(t,a);
   document.querySelectorAll('.bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
   var p=$('bpos');if(p)p.textContent=(i+1)+' of '+n;
@@ -1055,6 +1056,7 @@ function runSync(){
 function runGo(i,instant){
   var t=$('btrack');if(!t||!t.children.length)return;
   i=Math.max(0,Math.min(t.children.length-1,i));
+  if(!t.offsetParent){if(t.children[i].dataset.bid)runId=t.children[i].dataset.bid;return;}
   var x=t.children[i].offsetLeft-t.children[0].offsetLeft;
   if(instant){t.style.scrollBehavior='auto';t.scrollLeft=x;t.style.scrollBehavior='';}else t.scrollTo({left:x,behavior:'smooth'});
   if(t.children[i].dataset.bid)runId=t.children[i].dataset.bid;
@@ -1062,7 +1064,11 @@ function runGo(i,instant){
 }
 /* ---------- generic swipe carousel (orders, pre-orders, online orders) ---------- */
 var CAR={},carT={};
-function fitTrack(t,a){t.style.height=a.offsetHeight+'px';}
+function fitTrack(t,a){var h=a.offsetHeight;t.style.height=h?h+'px':'';}
+function refitCarousels(){
+  Object.keys(CAR).forEach(function(id){var t=$('ctrack-'+id);if(!t||!t.offsetParent)return;var i=0;[].forEach.call(t.children,function(c,k){if(c.dataset.ck===CAR[id])i=k;});carGo(id,i,true);});
+  var bt=$('btrack');if(bt&&bt.offsetParent){var j=0;[].forEach.call(bt.children,function(c,k){if(c.dataset.bid===runId)j=k;});runGo(j,true);}
+}
 window.addEventListener('resize',function(){document.querySelectorAll('.btrack').forEach(function(t){t.style.height='';});setTimeout(function(){Object.keys(CAR).forEach(carSync);runSync();},50);});
 function carHtml(id,slides,noun){
   if(!slides.length)return '';
@@ -1075,7 +1081,7 @@ function carHtml(id,slides,noun){
 }
 function carIdx(id){var t=$('ctrack-'+id);if(!t||!t.children.length)return 0;var w=t.children[0].getBoundingClientRect().width+12;return Math.max(0,Math.min(t.children.length-1,Math.round(t.scrollLeft/w)));}
 function carSync(id){
-  var t=$('ctrack-'+id);if(!t)return;var i=carIdx(id),n=t.children.length,a=t.children[i];
+  var t=$('ctrack-'+id);if(!t||!t.offsetParent)return;var i=carIdx(id),n=t.children.length,a=t.children[i];
   if(a){CAR[id]=a.dataset.ck;fitTrack(t,a);}
   var nav=$('cnav-'+id);if(!nav)return;
   nav.querySelectorAll('.bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
@@ -1085,6 +1091,7 @@ function carSync(id){
 function carGo(id,i,instant){
   var t=$('ctrack-'+id);if(!t||!t.children.length)return;
   i=Math.max(0,Math.min(t.children.length-1,i));
+  if(!t.offsetParent){CAR[id]=t.children[i].dataset.ck;return;}
   var x=t.children[i].offsetLeft-t.children[0].offsetLeft;
   if(instant){t.style.scrollBehavior='auto';t.scrollLeft=x;t.style.scrollBehavior='';}else t.scrollTo({left:x,behavior:'smooth'});
   CAR[id]=t.children[i].dataset.ck;carSync(id);
@@ -1093,7 +1100,7 @@ function carInit(id,startKey){
   var t=$('ctrack-'+id);if(!t)return;
   var want=CAR[id]!=null?CAR[id]:startKey,i=0;
   [].forEach.call(t.children,function(c,k){if(c.dataset.ck===want)i=k;});
-  carGo(id,i,true);
+  if(!t.offsetParent){CAR[id]=t.children[i]?t.children[i].dataset.ck:want;}else carGo(id,i,true);
   t.addEventListener('scroll',function(){clearTimeout(carT[id]);carT[id]=setTimeout(function(){carSync(id);},60);},{passive:true});
 }
 function localDT(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());}
@@ -1808,6 +1815,7 @@ function batchOpts(selected){
 }
 var batchManual=false,stockOpen={};
 document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset&&d.dataset.sd){if(d.open)stockOpen[d.dataset.sd]=1;else delete stockOpen[d.dataset.sd];}},true);
+document.addEventListener('toggle',function(e){var t=e.target&&e.target.closest&&e.target.closest('.btrack'),sl=e.target.closest&&e.target.closest('.cslide,.batch');if(t&&sl)fitTrack(t,sl);},true);
 function fillResDates(){
   var sel=$('rDate');if(!sel||document.activeElement===sel)return;
   var cur=sel.value,ds=batchDates(),today=ymd(new Date());
@@ -1928,13 +1936,14 @@ function renderReserve(){
   }
   var box=$('capRows');
   if(!box.contains(document.activeElement)){
-    var html2='',d0=new Date();
+    var slides=[],d0=new Date(),start=null;
     for(var i=0;i<14;i++){
       var d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i),k2=ymd(d),cap=capFor(k2),used=usedOn(k2),left=cap-used,over2=left<-0.001,pct=cap>0?Math.min(100,used/cap*100):(used>0?100:0),bn=batchName(k2);
       var sub=cap<=0?'No delivery':(over2?'Over by '+r1(-left)+' '+bw(-left):(stockRows(k2).length?'':'No products limited yet'));
-      html2+='<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g)return '<div class="field"><label>'+prodDot(p.name)+esc(shortName(p.name))+' (tubs)</label><span class="small"><b>'+greekAvail(k2)+'</b> free to sell, from your Greek yogurt count</span><span class="muted small">'+used3+' pre-ordered</span></div>';return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>';
+      if(!start&&cap>0)start=k2;slides.push({key:k2,one:true,label:dateLabel(k2),html:'<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g)return '<div class="field"><label>'+prodDot(p.name)+esc(shortName(p.name))+' (tubs)</label><span class="small"><b>'+greekAvail(k2)+'</b> free to sell, from your Greek yogurt count</span><span class="muted small">'+used3+' pre-ordered</span></div>';return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>'});
     }
-    box.innerHTML=html2;
+    box.innerHTML='<span class="lbl" style="display:block;margin-top:14px">Change a single day</span><p class="muted small" style="margin:2px 0 8px">Only for exceptions: close one day, or change what is available for that day only.</p>'+carHtml('cap',slides,'day');
+    carInit('cap',start);
   }
   if(document.activeElement!==$('delFee'))$('delFee').value=S.deliveryFee;
   var fe=$('flavEditor');
@@ -2086,6 +2095,7 @@ function show(tab){
   activeTab=tab;
   TABS.forEach(function(t){$('tab-'+t).hidden=t!==tab;var b=$('nav-'+t);if(t===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   window.scrollTo(0,0);
+  refitCarousels();
 }
 
 /* ---------- sample data ---------- */
