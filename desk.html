@@ -764,7 +764,7 @@ var DEFAULT_STEPS=[
 ];
 function defaults(){return {
   stepsVersion:2,prodDays:[0,1,2,3,4,5,6],packDays:[1,3,5],startTime:'06:00',batchSeq:0,
-  recipe:{batches:1,waterCups:14,cupMl:250,powderG:875,starterG:125,mixL:4,tubG:350,greekPerBatch:7},
+  recipe:{batches:1,waterCups:14,cupMl:250,powderG:875,starterG:125,mixL:4,tubG:350,greekPerBatch:4},greek4:1,
   fill:{type:'greek',plain:'jam',qty:10,tub:{yogurt:500,sugar:30,jam:60},drink:{yogurt:100,water:100,sugar:12,jam:16}},
   steps:DEFAULT_STEPS.map(function(s){return {label:s.label,mins:s.mins,mode:s.mode};}),
   products:[{name:'Greek Yogurt @ 350g',color:0,kg:0.52,price:140,packQty:1,sugarG:0,jamG:0,flavored:false},{name:'Plain Yogurt @ 500g',color:1,kg:0.5,price:120,packQty:1,sugarG:30,jamG:0,flavored:false},{name:'Flavored Yogurt @ 500g',color:2,kg:0.5,price:140,packQty:1,sugarG:30,jamG:60,flavored:true,flavorList:['Strawberry','Blueberry']},{name:'Yogurt Drink (Mix and Match) @ 200ml',color:3,kg:0.1,price:100,packQty:3,sugarG:12,jamG:16,flavored:true},{name:'Yogurt Mini (Mix and Match) @ 100g',color:4,kg:0.1,price:100,packQty:3,sugarG:0,jamG:0,flavored:true}],
@@ -819,6 +819,7 @@ function applySettings(d){
   S.products.forEach(function(p){p.flavored=!!p.flavored;if(p.flavorList!==undefined&&!Array.isArray(p.flavorList))delete p.flavorList;});
   if(!S.packTicks||typeof S.packTicks!=='object')S.packTicks={};
   if(d&&d.recipe&&d.recipe.greekPerBatch===undefined&&d.recipe.tubsLow>0)S.recipe.greekPerBatch=d.recipe.tubsLow;
+  if(d&&!d.greek4){S.recipe.greekPerBatch=4;S.greek4=1;setTimeout(saveSettings,0);}
   if(!S.capacity||typeof S.capacity!=='object')S.capacity=fresh.capacity;
   if(!S.capacity.byDate||typeof S.capacity.byDate!=='object')S.capacity.byDate={};
   if(!S.capacity.tubs||typeof S.capacity.tubs!=='object')S.capacity.tubs={};
@@ -902,7 +903,7 @@ function stepTimes(b){
     return {i:i,label:s.label,mins:s.mins,start:st,end:en,ready:ready,manual:mode==='manual',set:at[i]!=null,done:!!(b.done&&b.done[i])};
   });
 }
-function isFinished(b){return b.steps.every(function(s,i){return b.done&&b.done[i];});}
+function isFinished(b){return !!b.failed||b.steps.every(function(s,i){return b.done&&b.done[i];});}
 function dueSteps(){
   var now=Date.now(),out=[];
   mem.batches.forEach(function(b){
@@ -991,22 +992,24 @@ function mixLine(b){
   return 'Water '+r1(r.waterCups)+' cups · Milk powder '+wt(r.powderG)+' · Starter '+wt(r.starterG)+' · Makes '+tubsText(r.tubsLow,r.tubsHigh)+' Greek tubs of '+r.tubG+' g';
 }
 function packedField(b){
-  var low=b.recipe?b.recipe.tubsLow:0,high=b.recipe?b.recipe.tubsHigh:0,got=b.packed;
-  var diff=(got!=null&&low)?' <span class="pill '+(got>=low?'good':'warn')+'">'+(got>=low?'On plan':'Under plan')+'</span>':'';
-  return '<div class="field" style="width:130px"><label for="packed-'+b.id+'">Greek tubs made</label><input id="packed-'+b.id+'" type="number" min="0" step="1" inputmode="numeric" data-act="packed" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+tubsText(low,high)+'"></div>'+diff;
+  if(b.failed)return '<span class="pill bad">Failed batch · 0 Greek tubs</span>';
+  var plan=tubsPlan(b),got=b.packed;
+  var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':(tubsOf(b)?' <span class="pill">Expecting '+plan+'</span>':'');
+  return '<div class="field" style="width:130px"><label for="packed-'+b.id+'">Greek tubs made</label><input id="packed-'+b.id+'" type="number" min="0" step="1" inputmode="numeric" data-act="packed" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+plan+'"></div>'+diff;
 }
+function failBtn(b){return '<button type="button" class="btn small '+(b.failed?'quiet':'danger')+'" data-act="bfail" data-id="'+b.id+'">'+(b.failed?'Not failed after all':'Mark failed')+'</button>';}
 function strainedField(b){
   var got=b.strained,ph=b.recipe&&b.recipe.mixL?r1(b.recipe.mixL):'';
   return '<div class="field" style="width:140px"><label for="strained-'+b.id+'">Yogurt strained (L)</label><input id="strained-'+b.id+'" type="number" min="0" step="0.1" inputmode="decimal" data-act="strained" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+ph+'"></div>';
 }
 function strainLine(){
-  var sb=mem.batches.filter(function(b){return b.strained!=null;});
+  var sb=mem.batches.filter(function(b){return b.strained!=null&&!b.failed;});
   if(!sb.length)return '';
-  var tot=sum(sb,function(b){return b.strained;}),both=sb.filter(function(b){return b.packed!=null&&b.strained>0;});
+  var tot=sum(sb,function(b){return b.strained;}),both=sb.filter(function(b){return b.packed!=null&&b.strained>0&&!b.failed;});
   return '<p class="muted small">Strained so far: '+r1(tot)+' L over '+sb.length+(sb.length===1?' batch':' batches')+', about '+r1(tot/sb.length)+' L each'+(both.length?'. That gives about '+r1(sum(both,function(b){return b.packed;})/sum(both,function(b){return b.strained;}))+' Greek tubs per liter strained':'')+'.</p>';
 }
 function avgLine(){
-  var done=mem.batches.filter(function(b){return b.packed!=null;});
+  var done=mem.batches.filter(function(b){return b.packed!=null&&!b.failed;});
   if(!done.length)return '';
   return '<p class="muted small">Average so far: '+r1(sum(done,function(b){return b.packed;})/done.length)+' Greek tubs per batch, from '+done.length+(done.length===1?' batch':' batches')+' (lowest '+Math.min.apply(null,done.map(function(b){return b.packed;}))+', highest '+Math.max.apply(null,done.map(function(b){return b.packed;}))+').</p>'+(Math.round(sum(done,function(b){return b.packed;})/done.length)!==Math.round(S.recipe.greekPerBatch)?'<div class="actions"><button type="button" class="btn small quiet" data-act="useavg">Use '+Math.round(sum(done,function(b){return b.packed;})/done.length)+' as my Greek tubs per batch</button></div>':'');
 }
@@ -1031,7 +1034,7 @@ function renderProduction(){
         var st=stepTimes(b),done=st.filter(function(s){return s.done;}).length;
         return '<article class="batch" data-bid="'+b.id+'"><div class="bhead"><div><h3>'+batchDot(b.name)+esc(b.name)+', '+sizeLabel(b)+'</h3><p class="muted small">Started '+fmtDT(b.startAt)+'</p></div><span class="pill acc">'+done+' of '+st.length+' done</span></div>'
           +'<p class="muted small">'+esc(mixLine(b))+'</p><ol class="steps">'+st.map(function(s){return stepRow(b,s);}).join('')+'</ol>'
-          +'<div class="bfoot"><div class="actions" style="align-items:flex-end">'+strainedField(b)+packedField(b)+'</div>'+'<div class="actions"><button type="button" class="btn small quiet" data-act="alldone" data-id="'+b.id+'">Mark all done</button><button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></div></article>';
+          +'<div class="bfoot"><div class="actions" style="align-items:flex-end">'+strainedField(b)+packedField(b)+'</div>'+'<div class="actions"><button type="button" class="btn small quiet" data-act="alldone" data-id="'+b.id+'">Mark all done</button>'+failBtn(b)+'<button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></div></article>';
       }).join('')+'</div></div>';
       runGo(keepIdx,true);
       $('btrack').addEventListener('scroll',function(){clearTimeout(runScrollT);runScrollT=setTimeout(runSync,60);},{passive:true});
@@ -1041,7 +1044,7 @@ function renderProduction(){
   var fin=mem.batches.filter(isFinished).sort(function(a,c){return c.startAt-a.startAt;}).slice(0,12);
   if(!$('finished').contains(document.activeElement)){
     $('finished').innerHTML=fin.length?avgLine()+strainLine()+'<ul class="list">'+fin.map(function(b){
-      return '<li><div class="main"><strong>'+batchDot(b.name)+esc(b.name)+', '+sizeLabel(b)+'</strong><span class="muted small">'+fmtDT(b.startAt)+'</span></div><div class="side">'+strainedField(b)+packedField(b)+'<button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></li>';
+      return '<li><div class="main"><strong>'+batchDot(b.name)+esc(b.name)+', '+sizeLabel(b)+'</strong><span class="muted small">'+fmtDT(b.startAt)+'</span></div><div class="side">'+(b.failed?'':strainedField(b))+packedField(b)+failBtn(b)+'<button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></li>';
     }).join('')+'</ul>':'<p class="muted">Finished batches show up here with how many Greek tubs you made.</p>';
   }
 
@@ -1735,7 +1738,22 @@ function madeDay(b){
   return ymd(new Date(b.startAt));
 }
 function invCounts(){if(!S.greekCount||typeof S.greekCount!=='object')S.greekCount={};return S.greekCount;}
-function invMade(d){return sum(mem.batches.filter(function(b){return b.packed!=null&&madeDay(b)===d;}),function(b){return Math.max(0,b.packed);});}
+/* every batch started from this date counts as greekPerBatch tubs (x size) until you type the real number or mark it failed */
+var EXPECT_FROM=new Date(2026,9,28).getTime();
+function tubsPlan(b){return Math.max(0,Math.round((Number(S.recipe.greekPerBatch)||4)*(Number(b.size)||1)));}
+function tubsOf(b){if(b.failed)return 0;if(b.packed!=null)return Math.max(0,b.packed);return b.startAt>=EXPECT_FROM?tubsPlan(b):0;}
+/* expected tubs land on the batch's planned packing day; real counts land on the day you type them */
+function invDay(b){
+  if(b.packed!=null||b.failed)return madeDay(b);
+  try{
+    /* a step you time by hand (like straining) is assumed to start as soon as it can */
+    var at=Object.assign({},b.at||{}),t;
+    for(var k=0;k<=b.steps.length;k++){t=stepTimes(Object.assign({},b,{at:at}));var gap=t.find(function(s){return s.manual&&s.start==null&&s.ready!=null;});if(!gap)break;at[gap.i]=gap.ready;}
+    var last=t[t.length-1],ts=last&&(last.start!=null?last.start:last.end);if(ts!=null)return ymd(new Date(ts));
+  }catch(e){}
+  return madeDay(b);
+}
+function invMade(d){return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf);}
 function invOut(d){
   var o=sum(mem.orders.filter(function(x){return x.date===d&&!x.fee&&GREEK.test(x.product);}),piecesOf);
   var r=sum(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee&&GREEK.test(x.product);}),piecesOf);
@@ -1746,7 +1764,7 @@ function invLedger(to){
   if(cdays.length)from=cdays[cdays.length-1];
   else{
     var first=null;
-    mem.batches.forEach(function(b){if(b.packed!=null){var m=madeDay(b);if(!first||m<first)first=m;}});
+    mem.batches.forEach(function(b){if(tubsOf(b)>0){var m=invDay(b);if(!first||m<first)first=m;}});
     from=first||ymd(new Date());
   }
   var rows=[],prev=null;
@@ -1761,7 +1779,7 @@ var invCache=null,invCacheKey='';
 function invMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invCounts())+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'');}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
+  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invCounts())+S.recipe.greekPerBatch+':'+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
   if(invCache&&invCacheKey===key)return invCache;
   var m={};invLedger(last).forEach(function(r){m[r.d]=r;});
   invCache={rows:m,last:last};invCacheKey=key;return invCache;
@@ -1775,7 +1793,7 @@ function greekAvail(D){
 function renderInventory(){
   var card=$('invCard');if(!card||!greekProd())return;
   var today=ymd(new Date()),m=invMap(),t=m.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
-  var hasData=Object.keys(invCounts()).length||mem.batches.some(function(b){return b.packed!=null;});
+  var hasData=Object.keys(invCounts()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
   $('invNow').textContent=Math.max(0,greekAvail(today))+' free to sell';
   $('invTiles').innerHTML=tile(t.start,'On hand this morning')+tile(t.made?'+'+t.made:'0','Made today')+tile(t.out?'−'+t.out:'0','Orders today')+tile(t.end,'Left tonight',t.end<0?'neg':'');
   var cb=$('invCountBox');
@@ -1791,7 +1809,7 @@ function renderInventory(){
   }
   $('invTable').innerHTML='<thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
     +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+r.start+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+r.made:'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+r.out:'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+r.end+'</td></tr>';}).join('')+'</tbody>';
-  $('invNote').textContent='Made comes from "Greek tubs made" on each batch, counted on the day you enter it. Orders are the Greek tubs in orders and pre-orders for that date. What is left carries to the next day. Your shop only offers tubs that are already made and not yet promised.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than made: count your tubs or move an order.':'');
+  $('invNote').textContent='Every batch you start counts as '+(Number(S.recipe.greekPerBatch)||4)+' Greek tubs on its packing day, so the shop can sell them ahead. Type the real number in "Greek tubs made" to replace it, or tap Mark failed and the batch counts as 0. Orders are the Greek tubs in orders and pre-orders for that date. What is left carries to the next day. Your shop only offers tubs that are already made and not yet promised.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than made: count your tubs or move an order.':'');
 }
 function stockFor(date,name){
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
@@ -2242,6 +2260,7 @@ document.addEventListener('click',function(e){
   var a=t.dataset.act,id=t.dataset.id;
   if(a==='toggle'){var b=mem.batches.find(function(x){return x.id===id;});if(b){var ti=Number(t.dataset.i),nb=Object.assign({},b,{done:b.steps.map(function(s,i){return i===ti?!(b.done&&b.done[i]):!!(b.done&&b.done[i]);})});var stx=stepTimes(b)[ti];if(stx&&stx.manual&&!stx.set&&nb.done[ti]){nb.at=Object.assign({},b.at||{});nb.at[ti]=Date.now();}put('batches',nb);}}
   else if(a==='skipstart'){S.skipStart=t.dataset.day;saveSettings();renderAll();toast('Start reminder skipped for that day.');}
+  else if(a==='bfail'){var bf=mem.batches.find(function(x){return x.id===id;});if(bf){var nf=!bf.failed;put('batches',Object.assign({},bf,{failed:nf,failedAt:nf?Date.now():null}));toast(nf?'Marked failed. Its Greek tubs are off your count and the shop.':'Batch counts again.');}}
   else if(a==='alldone'){var b2=mem.batches.find(function(x){return x.id===id;});if(b2)put('batches',Object.assign({},b2,{done:b2.steps.map(function(){return true;})}));}
   else if(a==='pay'){var o=mem.orders.find(function(x){return x.id===id;});if(o)put('orders',Object.assign({},o,{paid:!o.paid}));}
   else if(a==='paygroup')payGroup(t.dataset.key);
@@ -2259,7 +2278,7 @@ document.addEventListener('click',function(e){
   else if(a==='packnextday'){var pd3=parseYmd(packDay);pd3.setDate(pd3.getDate()+1);setPackDay(nextPackDay(ymd(pd3)));}
   else if(a==='packcopy'){var ptx=packText();if(ptx)copyText(ptx,'Packing list copied');else toast('Nothing to pack on this day.');}
   else if(a==='gocosts'){show('reserve');var dd=document.querySelector('#tab-reserve details:last-of-type');if(dd){dd.open=true;dd.scrollIntoView();}}
-  else if(a==='useavg'){var dn=mem.batches.filter(function(b){return b.packed!=null;});if(dn.length){S.recipe.greekPerBatch=Math.max(1,Math.round(sum(dn,function(b){return b.packed;})/dn.length));saveSettings();renderAll();toast('Greek tubs per batch is now '+S.recipe.greekPerBatch);}}
+  else if(a==='useavg'){var dn=mem.batches.filter(function(b){return b.packed!=null&&!b.failed;});if(dn.length){S.recipe.greekPerBatch=Math.max(1,Math.round(sum(dn,function(b){return b.packed;})/dn.length));saveSettings();renderAll();toast('Greek tubs per batch is now '+S.recipe.greekPerBatch);}}
   else if(a==='flavadd'){S.flavors.push('New flavor');saveSettings();renderAll();}
   else if(a==='flavrm'){S.flavors.splice(Number(t.dataset.i),1);saveSettings();renderAll();}
   else if(a==='flv')flvClick(t);
