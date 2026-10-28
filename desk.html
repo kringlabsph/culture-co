@@ -1738,10 +1738,9 @@ function madeDay(b){
   return ymd(new Date(b.startAt));
 }
 function invCounts(){if(!S.greekCount||typeof S.greekCount!=='object')S.greekCount={};return S.greekCount;}
-/* every batch started from this date counts as greekPerBatch tubs (x size) until you type the real number or mark it failed */
-var EXPECT_FROM=new Date(2026,9,28).getTime();
+/* every batch counts as greekPerBatch tubs (x size) until you type the real number or mark it failed; whatever isn't sold stays available */
 function tubsPlan(b){return Math.max(0,Math.round((Number(S.recipe.greekPerBatch)||4)*(Number(b.size)||1)));}
-function tubsOf(b){if(b.failed)return 0;if(b.packed!=null)return Math.max(0,b.packed);return b.startAt>=EXPECT_FROM?tubsPlan(b):0;}
+function tubsOf(b){if(b.failed)return 0;if(b.packed!=null)return Math.max(0,b.packed);return tubsPlan(b);}
 /* expected tubs land on the batch's planned packing day; real counts land on the day you type them */
 function invDay(b){
   if(b.packed!=null||b.failed)return madeDay(b);
@@ -1809,7 +1808,7 @@ function renderInventory(){
   }
   $('invTable').innerHTML='<thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
     +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+r.start+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+r.made:'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+r.out:'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+r.end+'</td></tr>';}).join('')+'</tbody>';
-  $('invNote').textContent='Every batch you start counts as '+(Number(S.recipe.greekPerBatch)||4)+' Greek tubs on its packing day, so the shop can sell them ahead. Type the real number in "Greek tubs made" to replace it, or tap Mark failed and the batch counts as 0. Orders are the Greek tubs in orders and pre-orders for that date. What is left carries to the next day. Your shop only offers tubs that are already made and not yet promised.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than made: count your tubs or move an order.':'');
+  $('invNote').textContent='Every batch you start counts as '+(Number(S.recipe.greekPerBatch)||4)+' Greek tubs on its packing day, so the shop can sell them ahead. Any tub not sold stays available and carries to the next day. Type the real number in "Greek tubs made" to replace it, or tap Mark failed and the batch counts as 0. Orders are the Greek tubs in orders and pre-orders for that date. What is left carries to the next day. Your shop only offers tubs that are already made and not yet promised.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than made: count your tubs or move an order.':'');
 }
 function stockFor(date,name){
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
