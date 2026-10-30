@@ -993,7 +993,7 @@ function stepRow(b,s){
   var wait=s.mins>0?' <span class="muted">then wait '+span(s.mins)+'</span>':'';
   var when=s.start!=null?fmtDT(s.start):(s.manual?'You choose when':'Waits on the time you set above');
   var inp=s.manual?'<input type="datetime-local" class="stime" aria-label="Time for '+esc(s.label)+'" data-act="steptime" data-id="'+b.id+'" data-i="'+s.i+'" value="'+(s.start!=null?localDT(new Date(s.start)):'')+'">':'';
-  return '<li class="step'+(s.done?' done':'')+'"><button type="button" class="check" aria-pressed="'+s.done+'" aria-label="'+(s.done?'Mark not done: ':'Mark done: ')+esc(s.label)+'" data-act="toggle" data-id="'+b.id+'" data-i="'+s.i+'"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><div class="t"><strong>'+esc(s.label)+'</strong><span class="muted small">'+when+wait+'</span>'+inp+'</div>'+pill+'</li>';
+  return '<li class="step'+(s.done?' done':'')+'"><button type="button" class="check" aria-pressed="'+s.done+'" aria-label="'+(s.done?'Mark not done: ':'Mark done: ')+esc(s.label)+'" data-act="toggle" data-id="'+b.id+'" data-i="'+s.i+'"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><div class="t"><strong>'+esc(s.label)+'</strong><span class="muted small">'+when+wait+'</span>'+inp+(s.manual&&!s.done&&!isRegular(b)&&/strain/i.test(s.label)?'<button type="button" class="btn small quiet" data-act="nostrain" data-id="'+b.id+'" style="margin-top:6px">Not needed, regular yogurt</button>':'')+'</div>'+pill+'</li>';
 }
 function sizeLabel(b){return b.size===1?'1 batch':r1(b.size)+' batches';}
 function mixLine(b){
@@ -1013,6 +1013,17 @@ function litersField(b){
   var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':' <span class="pill">Expecting '+r1(plan)+' L</span>';
   return '<div class="field" style="width:150px"><label for="liters-'+b.id+'">Yogurt made (L)</label><input id="liters-'+b.id+'" type="number" min="0" step="0.1" inputmode="decimal" data-act="liters" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+r1(plan)+'"></div>'+diff;
 }
+/* turn a running Greek batch into a regular one (no straining); keeps the old steps so it can be undone */
+function skipStrain(b){
+  var steps=[],done={},at={};
+  b.steps.forEach(function(st,i){
+    if(/strain/i.test(st.label)&&!/pack/i.test(st.label))return;
+    var j=steps.length;steps.push({label:st.label.replace(/strained yogurt/i,'yogurt and drinks'),mins:st.mins,mode:st.mode==='manual'?'after':st.mode});
+    if(b.done&&b.done[i])done[j]=true;if(b.at&&b.at[i]!=null)at[j]=b.at[i];
+  });
+  return Object.assign({},b,{type:'regular',liters:null,packed:null,steps:steps,done:steps.map(function(x,j){return !!done[j];}),at:at,greekBefore:{steps:b.steps,done:b.done||[],at:b.at||{},packed:b.packed==null?null:b.packed}});
+}
+function undoSkipStrain(b){var g=b.greekBefore;var nb=Object.assign({},b,{type:null,liters:null,steps:g.steps,done:g.done,at:g.at,packed:g.packed});delete nb.type;delete nb.greekBefore;return nb;}
 function batchFields(b){return isRegular(b)?litersField(b):strainedField(b)+packedField(b);}
 function failBtn(b){return '<button type="button" class="btn small '+(b.failed?'quiet':'danger')+'" data-act="bfail" data-id="'+b.id+'">'+(b.failed?'Not failed after all':'Mark failed')+'</button>';}
 function strainedField(b){
@@ -1051,7 +1062,7 @@ function renderProduction(){
         var st=stepTimes(b),done=st.filter(function(s){return s.done;}).length;
         return '<article class="batch" data-bid="'+b.id+'"><div class="bhead"><div><h3>'+batchDot(b.name)+esc(b.name)+', '+sizeLabel(b)+'</h3>'+(isRegular(b)?'<span class="pill">Regular, no straining</span>':'')+'<p class="muted small">Started '+fmtDT(b.startAt)+'</p></div><span class="pill acc">'+done+' of '+st.length+' done</span></div>'
           +'<p class="muted small">'+esc(mixLine(b))+'</p><ol class="steps">'+st.map(function(s){return stepRow(b,s);}).join('')+'</ol>'
-          +'<div class="bfoot"><div class="actions" style="align-items:flex-end">'+batchFields(b)+'</div>'+'<div class="actions"><button type="button" class="btn small quiet" data-act="alldone" data-id="'+b.id+'">Mark all done</button>'+failBtn(b)+'<button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></div></article>';
+          +'<div class="bfoot"><div class="actions" style="align-items:flex-end">'+batchFields(b)+'</div>'+'<div class="actions"><button type="button" class="btn small quiet" data-act="alldone" data-id="'+b.id+'">Mark all done</button>'+(b.greekBefore?'<button type="button" class="btn small quiet" data-act="yesstrain" data-id="'+b.id+'">Strain after all</button>':'')+failBtn(b)+'<button type="button" class="btn small danger" data-del="batches:'+b.id+'">Delete</button></div></div></article>';
       }).join('')+'</div></div>';
       runGo(keepIdx,true);
       $('btrack').addEventListener('scroll',function(){clearTimeout(runScrollT);runScrollT=setTimeout(runSync,60);},{passive:true});
@@ -1785,14 +1796,17 @@ function invDay(b){
   }catch(e){}
   return madeDay(b);
 }
-function invMade(d){return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf);}
+function invMadeSet(){if(!S.greekMade||typeof S.greekMade!=='object')S.greekMade={};return S.greekMade;}
+function invTotals(){if(!S.greekTotal||typeof S.greekTotal!=='object')S.greekTotal={};return S.greekTotal;}
+/* tubs made that day: what you typed in "Made today", otherwise what the batches add up to */
+function invMade(d){var m=invMadeSet();if(m[d]!=null)return Number(m[d]);return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf);}
 function invOut(d){
   var o=sum(mem.orders.filter(function(x){return x.date===d&&!x.fee&&GREEK.test(x.product);}),piecesOf);
   var r=sum(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee&&GREEK.test(x.product);}),piecesOf);
   return o+r;
 }
 function invLedger(to){
-  var counts=invCounts(),cdays=Object.keys(counts).filter(function(k){return k<=to;}).sort(),from;
+  var counts=invCounts(),totals=invTotals(),cdays=Object.keys(counts).concat(Object.keys(totals)).filter(function(k){return k<=to;}).sort(),from;
   if(cdays.length)from=cdays[cdays.length-1];
   else{
     var first=null;
@@ -1801,7 +1815,9 @@ function invLedger(to){
   }
   var rows=[],prev=null;
   for(var d=from;d<=to;d=addDays(d,1)){
-    var counted=counts[d]!=null,start=counted?Number(counts[d]):(prev==null?0:prev),made=invMade(d),out=invOut(d),end=start+made-out;
+    var made=invMade(d),out=invOut(d),tot=totals[d]!=null,counted=tot||counts[d]!=null;
+    /* "Overall tubs" includes what was made that day, so the morning start is overall minus made */
+    var start=tot?Number(totals[d])-made:counts[d]!=null?Number(counts[d]):(prev==null?0:prev),end=start+made-out;
     rows.push({d:d,start:start,counted:counted,made:made,out:out,end:end});prev=end;
     if(rows.length>400)break;
   }
@@ -1811,7 +1827,7 @@ var invCache=null,invCacheKey='';
 function invMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invCounts())+S.recipe.greekPerBatch+':'+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
+  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invCounts())+JSON.stringify(invMadeSet())+JSON.stringify(invTotals())+S.recipe.greekPerBatch+':'+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
   if(invCache&&invCacheKey===key)return invCache;
   var m={};invLedger(last).forEach(function(r){m[r.d]=r;});
   invCache={rows:m,last:last};invCacheKey=key;return invCache;
@@ -1825,13 +1841,16 @@ function greekAvail(D){
 function renderInventory(){
   var card=$('invCard');if(!card||!greekProd())return;
   var today=ymd(new Date()),m=invMap(),t=m.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
-  var hasData=Object.keys(invCounts()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
+  var hasData=Object.keys(invCounts()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
   $('invNow').textContent=Math.max(0,greekAvail(today))+' free to sell';
   $('invTiles').innerHTML=tile(t.start,'On hand this morning')+tile(t.made?'+'+t.made:'0','Made today')+tile(t.out?'−'+t.out:'0','Orders today')+tile(t.end,'Left tonight',t.end<0?'neg':'');
   var cb=$('invCountBox');
   if(!cb.contains(document.activeElement)){
-    cb.innerHTML='<div class="invcount"><div class="field"><label for="invCount">Count your tubs</label><input id="invCount" type="number" min="0" step="1" inputmode="numeric" placeholder="'+t.start+'"></div><button type="button" class="btn small" data-act="invsave">Save count</button>'+(t.counted?'<button type="button" class="btn small quiet" data-act="invclear">Undo today\'s count</button>':'')+'</div>'
-      +'<p class="muted small" style="margin:4px 0 0">'+(hasData?'Count in the morning, before you deliver or pack today\'s batch. It replaces the number Desk worked out.':'Start here: count the Greek tubs in your fridge now and save it. After that, Desk keeps the count for you.')+'</p>';
+    var mset=invMadeSet()[today],tset=invTotals()[today];
+    cb.innerHTML='<div class="invcount"><div class="field"><label for="invMadeIn">Made today</label><input id="invMadeIn" type="number" min="0" step="1" inputmode="numeric" placeholder="'+t.made+'" value="'+(mset!=null?mset:'')+'"></div>'
+      +'<div class="field"><label for="invCount">Overall tubs</label><input id="invCount" type="number" min="0" step="1" inputmode="numeric" placeholder="'+(t.start+t.made)+'" value="'+(tset!=null?tset:'')+'"></div>'
+      +'<button type="button" class="btn small" data-act="invsave">Save</button>'+(t.counted||mset!=null?'<button type="button" class="btn small quiet" data-act="invclear">Undo today</button>':'')+'</div>'
+      +'<p class="muted small" style="margin:4px 0 0">'+(hasData?'Made today: Greek tubs you packed today (replaces what the batches expect). Overall tubs: every Greek tub in your fridge now, including today\'s, before today\'s orders go out. Fill one or both; blank keeps what Desk worked out.':'Start here: type how many Greek tubs are in your fridge now in Overall tubs and save. After that, Desk keeps the count for you.')+'</p>';
   }
   var rows=[],d0=addDays(today,-3);
   for(var d=d0;d<=addDays(today,7);d=addDays(d,1)){
@@ -2356,6 +2375,8 @@ document.addEventListener('click',function(e){
   var a=t.dataset.act,id=t.dataset.id;
   if(a==='toggle'){var b=mem.batches.find(function(x){return x.id===id;});if(b){var ti=Number(t.dataset.i),nb=Object.assign({},b,{done:b.steps.map(function(s,i){return i===ti?!(b.done&&b.done[i]):!!(b.done&&b.done[i]);})});var stx=stepTimes(b)[ti];if(stx&&stx.manual&&!stx.set&&nb.done[ti]){nb.at=Object.assign({},b.at||{});nb.at[ti]=Date.now();}put('batches',nb);}}
   else if(a==='skipstart'){S.skipStart=t.dataset.day;saveSettings();renderAll();toast('Start reminder skipped for that day.');}
+  else if(a==='nostrain'){var bn2=mem.batches.find(function(x){return x.id===id;});if(bn2){put('batches',skipStrain(bn2));toast('No straining. This batch now counts as regular yogurt in liters.');}}
+  else if(a==='yesstrain'){var by=mem.batches.find(function(x){return x.id===id;});if(by&&by.greekBefore){put('batches',undoSkipStrain(by));toast('Back to a Greek batch with straining.');}}
   else if(a==='bfail'){var bf=mem.batches.find(function(x){return x.id===id;});if(bf){var nf=!bf.failed;put('batches',Object.assign({},bf,{failed:nf,failedAt:nf?Date.now():null}));toast(nf?(isRegular(bf)?'Marked failed. Its liters are off your count and the shop.':'Marked failed. Its Greek tubs are off your count and the shop.'):'Batch counts again.');}}
   else if(a==='alldone'){var b2=mem.batches.find(function(x){return x.id===id;});if(b2)put('batches',Object.assign({},b2,{done:b2.steps.map(function(){return true;})}));}
   else if(a==='pay'){var o=mem.orders.find(function(x){return x.id===id;});if(o)put('orders',Object.assign({},o,{paid:!o.paid}));}
@@ -2411,10 +2432,16 @@ document.addEventListener('click',function(e){
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
-  else if(a==='invsave'){var iv=$('invCount').value;if(iv===''||!(Number(iv)>=0)){toast('Type how many Greek tubs you have.');return;}invCounts()[ymd(new Date())]=Math.round(Number(iv));saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Count saved.');}
+  else if(a==='invsave'){
+    var iv=$('invCount').value,mv=$('invMadeIn').value,td=ymd(new Date());
+    if(iv===''&&mv===''){toast('Type Made today, Overall tubs, or both.');return;}
+    if((iv!==''&&!(Number(iv)>=0))||(mv!==''&&!(Number(mv)>=0))){toast('Use whole numbers, 0 or more.');return;}
+    if(mv!=='')invMadeSet()[td]=Math.round(Number(mv));else delete invMadeSet()[td];
+    if(iv!==''){invTotals()[td]=Math.round(Number(iv));delete invCounts()[td];}else delete invTotals()[td];
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Saved.');}
   else if(a==='yogsave'){var yv=$('yogCount').value;if(yv===''||!(Number(yv)>=0)){toast('Type how many liters you have.');return;}yogCounts()[ymd(new Date())]=r2(Number(yv));saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Count saved.');}
   else if(a==='yogclear'){delete yogCounts()[ymd(new Date())];saveSettings();renderAll();toast('Count removed.');}
-  else if(a==='invclear'){delete invCounts()[ymd(new Date())];saveSettings();renderAll();toast('Count removed.');}
+  else if(a==='invclear'){var tc=ymd(new Date());delete invCounts()[tc];delete invTotals()[tc];delete invMadeSet()[tc];saveSettings();renderAll();toast('Today\'s numbers removed.');}
   else if(a==='carprev')carGo(t.dataset.car,carIdx(t.dataset.car)-1);
   else if(a==='carnext')carGo(t.dataset.car,carIdx(t.dataset.car)+1);
   else if(a==='cardot')carGo(t.dataset.car,Number(t.dataset.i));
