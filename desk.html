@@ -233,6 +233,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 .invtbl tr.today td{font-weight:700;background:var(--bg)}
 .invtbl td.neg{color:var(--bad)}
 .invtbl td.dim{color:var(--muted)}
+.stockcar .cslide>.card{margin:0}
 .invcount{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .invcount input{width:110px}
 .capweek{display:flex;flex-wrap:wrap;gap:8px}
@@ -363,6 +364,10 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 
   <!-- PRODUCTION -->
   <section class="tab" id="tab-production" hidden>
+    <div class="stockcar">
+    <div class="bnav" id="cnav-stk"><button type="button" class="arw" data-act="carprev" data-car="stk" aria-label="Previous stock card">&#8249;</button><div class="bdots"><button type="button" data-act="cardot" data-car="stk" data-i="0" aria-label="Show Greek yogurt"></button><button type="button" data-act="cardot" data-car="stk" data-i="1" aria-label="Show Yogurt and drinks"></button></div><span class="bpos" id="cpos-stk"></span><button type="button" class="arw" data-act="carnext" data-car="stk" aria-label="Next stock card">&#8250;</button></div>
+    <div class="bcar"><div class="btrack" id="ctrack-stk" aria-roledescription="carousel" aria-label="Stock">
+    <div class="cslide" data-ck="greek">
     <div class="card" id="invCard">
       <div class="cardhead"><h2>Greek yogurt</h2><span class="pill acc" id="invNow"></span></div>
       <div class="tiles" id="invTiles"></div>
@@ -370,6 +375,8 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <div class="scroll"><table class="stocktbl invtbl" id="invTable"></table></div>
       <p class="muted small" id="invNote"></p>
     </div>
+    </div>
+    <div class="cslide" data-ck="yog">
     <div class="card" id="yogCard">
       <div class="cardhead"><h2>Yogurt and drinks</h2><span class="pill acc" id="yogNow"></span></div>
       <div class="tiles" id="yogTiles"></div>
@@ -377,6 +384,9 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <div id="yogCountBox"></div>
       <div class="scroll"><table class="stocktbl invtbl" id="yogTable"></table></div>
       <p class="muted small" id="yogNote"></p>
+    </div>
+    </div>
+    </div></div>
     </div>
     <div class="card">
       <h2>Schedule</h2>
@@ -1091,7 +1101,7 @@ function runCurId(){return runId;}
 function runSync(){
   var t=$('btrack');if(!t||!t.offsetParent)return;var i=runIdx(),n=t.children.length;
   var a=t.children[i];if(a&&a.dataset.bid)runId=a.dataset.bid;if(a)fitTrack(t,a);
-  document.querySelectorAll('.bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
+  document.querySelectorAll('#bnav .bdots button').forEach(function(d,k){d.setAttribute('aria-current',k===i?'true':'false');});
   var p=$('bpos');if(p)p.textContent=(i+1)+' of '+n;
   var nav=$('bnav');if(nav){nav.querySelector('[data-act="bprev"]').disabled=i===0;nav.querySelector('[data-act="bnext"]').disabled=i>=n-1;}
 }
@@ -1863,11 +1873,13 @@ function renderInventory(){
   $('invNote').textContent='Every batch you start counts as '+(Number(S.recipe.greekPerBatch)||4)+' Greek tubs on its packing day, so the shop can sell them ahead. Any tub not sold stays available and carries to the next day. Type the real number in "Greek tubs made" to replace it, or tap Mark failed and the batch counts as 0. Orders are the Greek tubs in orders and pre-orders for that date. What is left carries to the next day. Your shop only offers tubs that are already made and not yet promised.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than made: count your tubs or move an order.':'');
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
+function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};return S.yogMade;}
+function yogTotals(){if(!S.yogTotal||typeof S.yogTotal!=='object')S.yogTotal={};return S.yogTotal;}
 function yogCounts(){if(!S.yogCount||typeof S.yogCount!=='object')S.yogCount={};return S.yogCount;}
 function kgOf(name){var p=prodInfo(name);return p?Number(p.kg)||0:0;}
 function isPool(name){return !GREEK.test(name)&&kgOf(name)>0;}
-function yogActive(){return Object.keys(yogCounts()).length>0||mem.batches.some(isRegular);}
-function yogMade(d){return r2(sum(mem.batches.filter(function(b){return isRegular(b)&&invDay(b)===d;}),litersOf));}
+function yogActive(){return Object.keys(yogCounts()).length>0||Object.keys(yogTotals()).length>0||Object.keys(yogMadeSet()).length>0||mem.batches.some(isRegular);}
+function yogMade(d){var m=yogMadeSet();if(m[d]!=null)return Number(m[d]);return r2(sum(mem.batches.filter(function(b){return isRegular(b)&&invDay(b)===d;}),litersOf));}
 function yogOut(d){
   var f=function(x){return isPool(x.product)?piecesOf(x)*kgOf(x.product):0;};
   return r2(sum(mem.orders.filter(function(x){return x.date===d&&!x.fee;}),f)+sum(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee;}),f));
@@ -1876,14 +1888,15 @@ var yogCache=null,yogCacheKey='';
 function yogMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+JSON.stringify(yogCounts())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('');
+  var key=today+last+JSON.stringify(yogCounts())+JSON.stringify(yogMadeSet())+JSON.stringify(yogTotals())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('');
   if(yogCache&&yogCacheKey===key)return yogCache;
-  var counts=yogCounts(),cdays=Object.keys(counts).filter(function(k){return k<=last;}).sort(),from;
+  var counts=yogCounts(),totals=yogTotals(),cdays=Object.keys(counts).concat(Object.keys(totals)).filter(function(k){return k<=last;}).sort(),from;
   if(cdays.length)from=cdays[cdays.length-1];
   else{from=null;mem.batches.forEach(function(b){if(litersOf(b)>0){var m=invDay(b);if(!from||m<from)from=m;}});from=from||today;}
   var rows={},prev=null,n=0;
   for(var d=from;d<=last;d=addDays(d,1)){
-    var counted=counts[d]!=null,start=counted?Number(counts[d]):(prev==null?0:prev),made=yogMade(d),out=yogOut(d),end=r2(start+made-out);
+    var made=yogMade(d),out=yogOut(d),tot=totals[d]!=null,counted=tot||counts[d]!=null;
+    var start=tot?r2(Number(totals[d])-made):counts[d]!=null?Number(counts[d]):(prev==null?0:prev),end=r2(start+made-out);
     rows[d]={d:d,start:start,counted:counted,made:made,out:out,end:end};prev=end;
     if(++n>400)break;
   }
@@ -1912,8 +1925,11 @@ function renderYogInventory(){
   $('yogMakes').textContent=on?yogMakesText(free):'';
   var cb=$('yogCountBox');
   if(!cb.contains(document.activeElement)){
-    cb.innerHTML='<div class="invcount"><div class="field"><label for="yogCount">Liters of regular yogurt on hand</label><input id="yogCount" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+r1(Math.max(0,t.start))+'"></div><button type="button" class="btn small" data-act="yogsave">Save count</button>'+(t.counted?'<button type="button" class="btn small quiet" data-act="yogclear">Undo today\'s count</button>':'')+'</div>'
-      +'<p class="muted small" style="margin:4px 0 0">'+(on?'Count before you pack or deliver. Packed cups and drinks count too: a 500 g tub is 0.5 L, a mini or a drink is 0.1 L.':'Start here: start a Regular yogurt batch below, or measure the plain yogurt you have now and save it. After that, Desk keeps the count.')+'</p>';
+    var ymset=yogMadeSet()[today],ytset=yogTotals()[today];
+    cb.innerHTML='<div class="invcount"><div class="field"><label for="yogMadeIn">Made today (L)</label><input id="yogMadeIn" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+r1(t.made)+'" value="'+(ymset!=null?ymset:'')+'"></div>'
+      +'<div class="field"><label for="yogCount">Overall (L)</label><input id="yogCount" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+r1(Math.max(0,t.start+t.made))+'" value="'+(ytset!=null?ytset:'')+'"></div>'
+      +'<button type="button" class="btn small" data-act="yogsave">Save</button>'+(t.counted||ymset!=null?'<button type="button" class="btn small quiet" data-act="yogclear">Undo today</button>':'')+'</div>'
+      +'<p class="muted small" style="margin:4px 0 0">'+(on?'Made today: liters of regular yogurt you made today (replaces what the batches expect). Overall: all regular yogurt you have now, including today\'s and packed cups and drinks (500 g = 0.5 L, mini or drink = 0.1 L), before today\'s orders go out. Fill one or both.':'Start here: measure the regular yogurt you have now (packed cups and drinks count too) and save it in Overall, or start a Regular yogurt batch.')+'</p>';
   }
   var rows=[];
   for(var d=addDays(today,-3);d<=addDays(today,7);d=addDays(d,1)){
@@ -1923,6 +1939,7 @@ function renderYogInventory(){
   }
   $('yogTable').innerHTML=on?'<thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
     +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+r1(r.start)+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+r1(r.made):'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+r1(r.out):'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+r1(r.end)+'</td></tr>';}).join('')+'</tbody>':'';
+  setTimeout(function(){carSync('stk');},0);
   $('yogNote').textContent=on?'In liters. Every Regular yogurt batch counts as '+r1(Number(S.recipe.mixL)||4)+' L per batch on its packing day, so the shop can sell ahead. Type the real liters on the batch to replace it, or tap Mark failed and it counts as 0. Orders are the cups and drinks promised for that day (500 g = 0.5 L, mini or drink = 0.1 L). What is left carries to the next day, and every cup and drink shares the same liters.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than you have: count, or start a batch.':''):'Plain yogurt, flavored yogurt, minis and drinks all come from Regular yogurt batches. Once you start one, the shop sells from the liters you have instead of the fixed numbers in Delivery days.';
 }
 function stockFor(date,name){
@@ -2439,8 +2456,14 @@ document.addEventListener('click',function(e){
     if(mv!=='')invMadeSet()[td]=Math.round(Number(mv));else delete invMadeSet()[td];
     if(iv!==''){invTotals()[td]=Math.round(Number(iv));delete invCounts()[td];}else delete invTotals()[td];
     saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Saved.');}
-  else if(a==='yogsave'){var yv=$('yogCount').value;if(yv===''||!(Number(yv)>=0)){toast('Type how many liters you have.');return;}yogCounts()[ymd(new Date())]=r2(Number(yv));saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Count saved.');}
-  else if(a==='yogclear'){delete yogCounts()[ymd(new Date())];saveSettings();renderAll();toast('Count removed.');}
+  else if(a==='yogsave'){
+    var yv=$('yogCount').value,ym=$('yogMadeIn').value,yd=ymd(new Date());
+    if(yv===''&&ym===''){toast('Type Made today, Overall, or both.');return;}
+    if((yv!==''&&!(Number(yv)>=0))||(ym!==''&&!(Number(ym)>=0))){toast('Use liters, 0 or more.');return;}
+    if(ym!=='')yogMadeSet()[yd]=r2(Number(ym));else delete yogMadeSet()[yd];
+    if(yv!==''){yogTotals()[yd]=r2(Number(yv));delete yogCounts()[yd];}else delete yogTotals()[yd];
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Saved.');}
+  else if(a==='yogclear'){var yc=ymd(new Date());delete yogCounts()[yc];delete yogTotals()[yc];delete yogMadeSet()[yc];saveSettings();renderAll();toast('Today\'s numbers removed.');}
   else if(a==='invclear'){var tc=ymd(new Date());delete invCounts()[tc];delete invTotals()[tc];delete invMadeSet()[tc];saveSettings();renderAll();toast('Today\'s numbers removed.');}
   else if(a==='carprev')carGo(t.dataset.car,carIdx(t.dataset.car)-1);
   else if(a==='carnext')carGo(t.dataset.car,carIdx(t.dataset.car)+1);
@@ -2993,6 +3016,7 @@ $('eDate').value=ymd(new Date());
 
 lsLoad();
 renderAll();
+carInit('stk','greek');
 show(TABS.indexOf(location.hash.slice(1))>=0?location.hash.slice(1):'production');
 })();
 </script>
