@@ -605,6 +605,13 @@ function leftFor(p){            // pieces left for the chosen day, or Infinity i
   if (!b || !b.left || typeof b.left[p.name] !== "number") return Infinity;
   return b.left[p.name];
 }
+const poolOf = p => !p.greek && Number(p.kg) > 0;
+function poolL(){ const b = batchOf(selBatch); return b && typeof b.yogL === "number" ? b.yogL : null; }
+const poolUsed = () => shop.products.reduce((a, p, i) => a + (poolOf(p) ? usedOf(i) * p.kg : 0), 0);
+function poolRoom(p){            // pieces of p that still fit in the liters left, or Infinity
+  const L = poolL(); if (L == null || !poolOf(p)) return Infinity;
+  return Math.max(0, Math.floor((L - poolUsed()) / p.kg + 1e-9));
+}
 const usedOf = i => Object.keys(cart).filter(k => k === "p"+i || k.startsWith("p"+i+"|")).reduce((a,k) => a + cart[k], 0);
 
 /* ---------- data ---------- */
@@ -694,7 +701,7 @@ function stepper(key, label, val, canAdd){
 }
 function renderMenu(){
   $("menuList").innerHTML = shop.products.map((p, i) => {
-    const [, src, alt] = photoOf(p.name), left = leftFor(p), used = usedOf(i), canAdd = used < Math.min(left, 60);
+    const [, src, alt] = photoOf(p.name), used = usedOf(i), room = poolRoom(p), left = Math.min(leftFor(p), used + room), canAdd = used < Math.min(left, 60);
     const unit = isSet(p) ? (/drink/i.test(p.name) ? "bottles" : "cups") : "tubs";
     const stock = left === Infinity ? "" : left <= 0 ? `<span class="soldout">Sold out for ${esc(fmtShort(selBatch))}</span>` : `<span class="leftn">${left - used} ${unit} left for ${esc(fmtShort(selBatch))}</span>`;
     let rows;
@@ -748,6 +755,7 @@ function calc(){
     }
     const left = leftFor(p); if (used > left) problems.push(`${title(p.name)}: only ${left} left for ${fmtShort(selBatch)}.`);
   });
+  const L = poolL(); if (L != null && poolUsed() > L + 1e-9) problems.push(`Cups and drinks together are more than we have for ${fmtShort(selBatch)}. Remove a few and try again.`);
   const fee = fulfilment === "delivery" && items.length ? Number(shop.deliveryFee ?? 20) : 0;
   return { items, problems, subtotal, fee, total: subtotal + fee, pieces };
 }
