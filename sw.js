@@ -1,6 +1,6 @@
 // Culture Co. Desk service worker: lets Desk open with no signal and shows notifications.
 // When you change desk.html, bump VERSION (v2, v3...) so phones pick up the new copy.
-const VERSION = 'cc-desk-v17';
+const VERSION = 'cc-desk-v18';
 
 const SHELL = [
   'desk.html',
