@@ -1961,7 +1961,9 @@ function prodMatch(name){
 }
 function kgOf(name){var p=prodMatch(name);if(p)return Number(p.kg)||0;if(GREEK.test(name))return 0;var m=/(\d+(?:\.\d+)?)\s*(g|ml)\b/i.exec(String(name||''));return m?Number(m[1])/1000:0;}
 function yogLines(d){
-  return mem.orders.filter(function(x){return x.date===d&&!x.fee;}).concat(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee;}))
+  /* online orders still waiting for approval hold their yogurt too, like Greek */
+  var wait=[];(typeof webOrders!=='undefined'?webOrders:[]).forEach(function(o){if(o.preferredBatch===d)(o.items||[]).forEach(function(it){wait.push({product:it.product,qty:Number(it.qty)||0,pack:it.pack,waiting:true});});});
+  return mem.orders.filter(function(x){return x.date===d&&!x.fee;}).concat(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee;}),wait)
     .filter(function(x){return !GREEK.test(x.product);});
 }
 function isPool(name){return !GREEK.test(name)&&kgOf(name)>0;}
@@ -1974,7 +1976,7 @@ var yogCache=null,yogCacheKey='';
 function yogMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+JSON.stringify(yogCounts())+JSON.stringify(yogLeft())+JSON.stringify(yogMadeSet())+JSON.stringify(yogTotals())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('');
+  var key=today+last+JSON.stringify(yogCounts())+JSON.stringify(yogLeft())+JSON.stringify(yogMadeSet())+JSON.stringify(yogTotals())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('')+(typeof webOrders!=='undefined'?webOrders.map(function(o){return o.id+o.preferredBatch;}).join(','):'');
   if(yogCache&&yogCacheKey===key)return yogCache;
   var counts=yogCounts(),totals=yogTotals(),lefts=yogLeft(),cdays=Object.keys(counts).concat(Object.keys(totals),Object.keys(lefts)).filter(function(k){return k<=last;}).sort(),from;
   if(cdays.length)from=cdays[cdays.length-1];
