@@ -1822,12 +1822,35 @@ function invDay(b){
 function invMadeSet(){if(!S.greekMade||typeof S.greekMade!=='object')S.greekMade={};return S.greekMade;}
 function invLeft(){if(!S.greekLeft||typeof S.greekLeft!=='object')S.greekLeft={};return S.greekLeft;}
 function invTotals(){if(!S.greekTotal||typeof S.greekTotal!=='object')S.greekTotal={};return S.greekTotal;}
-/* tubs made that day: what you typed in "Made today", otherwise what the batches add up to */
-function invMade(d){var m=invMadeSet();if(m[d]!=null)return Number(m[d]);return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf);}
+/* expected Greek tubs: every Greek batch counts greekPerBatch tubs on the day it will be packed,
+   until you type what you really packed. Running batches use their own steps; production days you
+   haven't started yet are planned the same way. Anything overdue lands on today. */
+var invExpCache=null,invExpKey='';
+function invExpMap(){
+  var today=ymd(new Date()),last=addDays(today,35);
+  var key=today+JSON.stringify(S.prodDays)+S.startTime+JSON.stringify(S.steps)+JSON.stringify(S.packDays)+(S.skipStart||'')+S.recipe.greekPerBatch+mem.batches.map(function(b){return b.id+b.startAt+(b.packed==null?'n':b.packed)+(b.failed?'x':'')+(b.type||'')+b.size+JSON.stringify(b.at||{});}).join(',');
+  if(invExpCache&&invExpKey===key)return invExpCache;
+  var m={},per=Number(S.recipe.greekPerBatch)||4,add=function(day,n){if(day<today)day=today;m[day]=(m[day]||0)+n;};
+  mem.batches.forEach(function(b){if(b.failed||isRegular(b)||b.packed!=null)return;var d=invDay(b);if(addDays(d,3)<today)return;add(d,tubsPlan(b));});
+  var p=clockParts(),t0=new Date();
+  for(var i=0;i<=28;i++){
+    var dd=new Date(t0.getFullYear(),t0.getMonth(),t0.getDate()+i,p[0],p[1]),k=ymd(dd);
+    if(S.prodDays.indexOf(dd.getDay())<0||S.skipStart===k)continue;
+    if(mem.batches.some(function(b){return ymd(new Date(b.startAt))===k;}))continue;
+    var fake={startAt:dd.getTime(),steps:S.steps.map(function(x){return {label:x.label,mins:x.mins,mode:x.mode};}),at:{},done:[],size:1,packed:null};
+    var r=invDay(fake);if(r<=last)add(r,per);
+  }
+  invExpCache=m;invExpKey=key;return m;
+}
+function invExpected(d){var m=invMadeSet();if(m[d]!=null)return 0;return invExpMap()[d]||0;}
+/* tubs made that day: what you typed in "Packed", otherwise packed batches, plus what running/planned batches should give */
+function invMade(d){var m=invMadeSet();if(m[d]!=null)return Number(m[d]);return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf)+invExpected(d);}
 function invOut(d){
   var o=sum(mem.orders.filter(function(x){return x.date===d&&!x.fee&&GREEK.test(x.product);}),piecesOf);
   var r=sum(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee&&GREEK.test(x.product);}),piecesOf);
-  return o+r;
+  /* online orders still waiting for your approval hold their tubs too, so the shop can't oversell */
+  var w=sum((typeof webOrders!=='undefined'?webOrders:[]).filter(function(o){return o.preferredBatch===d;}),function(o){return sum((o.items||[]).filter(function(it){return GREEK.test(it.product);}),function(it){return (Number(it.qty)||0)*Math.max(1,Number(it.pack)||1);});});
+  return o+r+w;
 }
 function invLedger(to){
   var counts=invCounts(),totals=invTotals(),lefts=invLeft(),cdays=Object.keys(counts).concat(Object.keys(totals),Object.keys(lefts)).filter(function(k){return k<=to;}).sort(),from;
@@ -1851,7 +1874,7 @@ var invCache=null,invCacheKey='';
 function invMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invCounts())+JSON.stringify(invLeft())+JSON.stringify(invMadeSet())+JSON.stringify(invTotals())+S.recipe.greekPerBatch+':'+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
+  var key=today+last+mem.orders.length+':'+mem.reservations.length+':'+mem.batches.length+JSON.stringify(invExpMap())+(typeof webOrders!=='undefined'?webOrders.map(function(o){return o.id+o.preferredBatch;}).join(','):'')+JSON.stringify(invCounts())+JSON.stringify(invLeft())+JSON.stringify(invMadeSet())+JSON.stringify(invTotals())+S.recipe.greekPerBatch+':'+(mem.batches.map(function(b){return b.packed+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(','))+mem.reservations.map(function(r){return r.status+r.date+r.qty;}).join('')+mem.orders.map(function(o){return o.date+o.qty;}).join('');
   if(invCache&&invCacheKey===key)return invCache;
   var m={};invLedger(last).forEach(function(r){m[r.d]=r;});
   invCache={rows:m,last:last};invCacheKey=key;return invCache;
@@ -1881,10 +1904,10 @@ function renderStock(){
   var g=$('stkG');g.hidden=!hasG;
   if(hasG&&!(g.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
     var gm=invMap();gt=gm.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
-    gOn=Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
-    var gFree=Math.max(0,greekAvail(today)),gSet=invMadeSet()[today];
-    g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gt.end<0?' neg':'')+'">'+(gOn?gFree+' <small>tubs free</small>':'<small>Not counted yet</small>')+'</span></div>'
-      +(gOn?'<p class="muted small">Today: '+gt.start+' carried + '+gt.made+' packed − '+gt.out+' orders = <strong'+(gt.end<0?' class="neg"':'')+'>'+gt.end+' tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the Greek tubs in your fridge.</p>')
+    gOn=S.prodDays.length||Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
+    var gNext=batchDates()[0]||today,gFree=Math.max(0,greekAvail(gNext)),gSet=invMadeSet()[today];
+    g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gt.end<0?' neg':'')+'">'+(gOn?gFree+' <small>open for '+esc(gNext===today?'today':DOW[parseYmd(gNext).getDay()])+'</small>':'<small>Not counted yet</small>')+'</span></div>'
+      +(gOn?'<p class="muted small">Today: '+gt.start+' carried + '+(gt.made-invExpected(today))+' packed'+(invExpected(today)?' + '+invExpected(today)+' expected':'')+' − '+gt.out+' orders = <strong'+(gt.end<0?' class="neg"':'')+'>'+gt.end+' tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the Greek tubs in your fridge.</p>')
       +'<div class="stkadd"><input id="gAdd" type="number" min="1" step="1" inputmode="numeric" placeholder="+ Packed" aria-label="Greek tubs packed today"><button type="button" class="btn small" data-act="stkadd" data-k="g">Add</button>'
       +(gSet!=null?'<span class="muted small">'+gSet+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>';
   }
@@ -1919,7 +1942,7 @@ function renderStock(){
     var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set)');});
     html+='<h3>Yogurt &amp; drinks (liters)</h3>'+stkTable(stkDays(yogMap(),today),r1,today)+(bk.length?'<p class="muted small">Orders today: '+esc(bk.join(' · '))+'</p>':'');
   }
-  nx.innerHTML=html?html+'<p class="muted small">Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
+  nx.innerHTML=html?html+'<p class="muted small">Greek: each batch counts as '+(Number(S.recipe.greekPerBatch)||4)+' tubs on its packing day, including batches you haven\'t started yet on your production days, until you type what you really packed. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
 function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};return S.yogMade;}
@@ -2199,7 +2222,7 @@ function renderReserve(){
     $('resList').innerHTML=carHtml('res',slides,'batch');
     carInit('res');
   }
-  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt comes from your Greek yogurt count on the Production tab: only tubs already made and not yet promised can be ordered. For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
+  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt is open for pre-order from your production plan: every Greek batch counts as '+(Number(S.recipe.greekPerBatch)||4)+' tubs on its packing day, minus orders (including ones waiting for approval). For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el)el.checked=S.capacity.weekly[d]>0;});
   var tw=$('capTubsWeek');
   if(!tw.contains(document.activeElement)){
@@ -2958,7 +2981,7 @@ function webListen(){
     if(!webFirst)snap.docChanges().forEach(function(c){if(c.type==='added')fresh.push(c.doc.id);});
     webOrders=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).sort(function(a,b){return (a.queueNumber||0)-(b.queueNumber||0);});
     webFirst=false;
-    renderWeb();
+    renderAll();
     if(fresh.length){
       webBeep();
       var o=webOrders.find(function(x){return x.id===fresh[0];});
