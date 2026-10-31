@@ -101,6 +101,17 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .pill.good{background:var(--good-soft);color:var(--good)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.avrow{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 2px;border-top:1px solid var(--line);cursor:pointer}
+.avrow:first-child{border-top:0}
+.avrow .grow{flex:1;min-width:0;display:flex;flex-direction:column}
+.avrow.off strong{color:var(--muted);text-decoration:line-through}
+.tgl{position:relative;width:48px;height:28px;flex:none}
+.tgl input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.tgl span{position:absolute;inset:0;border-radius:14px;background:var(--line);transition:background .2s}
+.tgl span::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.tgl input:checked+span{background:var(--good)}
+.tgl input:checked+span::after{transform:translateX(20px)}
+.tgl input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .pill.acc{background:var(--accent-soft);color:var(--accent)}
 
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
@@ -554,6 +565,11 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <div id="webNotes" style="display:flex;flex-direction:column;gap:10px"></div>
       <div id="webList" style="display:flex;flex-direction:column;gap:12px"></div>
     </div>
+    <div class="card" id="availCard">
+      <div class="cardhead"><h2>Available on the website</h2><span class="pill" id="availCount"></span></div>
+      <p class="muted small">Switch a product off when you can't make it. Customers see it marked unavailable on the website and can't order it until you switch it back on.</p>
+      <div id="availList"></div>
+    </div>
     <div class="tiles" id="resTiles"></div>
 
     <div class="card">
@@ -827,7 +843,7 @@ function applySettings(d){
     S.products.forEach(function(p){var fp=fresh.products.find(function(x){return x.name===p.name;});if(p.sugarG==null)p.sugarG=fp?fp.sugarG:0;if(p.jamG==null)p.jamG=fp?fp.jamG:0;});
     S.productsVersion=3;
   }
-  S.products.forEach(function(p){if(p.pack==null)p.pack=0;});
+  S.products.forEach(function(p){if(p.pack==null)p.pack=0;p.off=!!p.off;});
   if(!S.costs||typeof S.costs!=='object')S.costs=fresh.costs;
   ['powder','starter','sugar','jam'].forEach(function(k){S.costs[k]=Math.max(0,Number(S.costs[k])||0);});
   if(!S.batchColors||typeof S.batchColors!=='object')S.batchColors={};
@@ -2191,6 +2207,9 @@ function renderReserve(){
     ['powder','starter','sugar','jam'].forEach(function(k){$('cost-'+k).value=S.costs[k]>0?S.costs[k]:'';});
   }
   $('costNote').textContent=S.costs.powder>0||S.costs.starter>0?'One batch costs about '+money(batchCost1())+' in milk powder and starter, so about '+money(batchCost1()/Math.max(1,S.recipe.greekPerBatch||7))+' per Greek tub before the tub itself.':'Enter what you pay per kilogram. The tub or bottle cost goes on each product below.';
+  var al=$('availList'),offN=S.products.filter(function(p){return p.off;}).length;
+  $('availCount').textContent=offN?offN+' off':'All on';$('availCount').className='pill'+(offN?' bad':' acc');
+  if(!al.contains(document.activeElement)||document.activeElement.type==='checkbox')al.innerHTML=S.products.map(function(p,i){return '<label class="avrow'+(p.off?' off':'')+'" for="avail-'+i+'"><span class="grow"><strong>'+prodDot(p.name)+esc(p.name)+'</strong><span class="muted small">'+(p.off?'Unavailable on the website':'Available to order')+'</span></span><span class="tgl"><input id="avail-'+i+'" type="checkbox" role="switch" data-avail="'+i+'"'+(p.off?'':' checked')+' aria-label="'+esc(p.name)+' available"><span></span></span></label>';}).join('');
   var ed=$('prodEditor');
   if(!ed.contains(document.activeElement)){
     ed.innerHTML=S.products.map(function(p,i){
@@ -2538,6 +2557,10 @@ document.addEventListener('change',function(e){
     if(t.value===''||!(tv>0))delete S.capacity.tubs[tk];else S.capacity.tubs[tk]=tv;
     saveSettings();renderAll();
   }
+  else if(t.dataset&&t.dataset.avail!==undefined){
+    var ap=S.products[Number(t.dataset.avail)];
+    if(ap){ap.off=!t.checked;saveSettings();renderAll();var af=$('avail-'+t.dataset.avail);if(af)af.focus();toast(ap.name+(ap.off?' is now unavailable on the website.':' is available again.'));}
+  }
   else if(t.dataset&&t.dataset.pflav!==undefined){
     var fp=S.products[Number(t.dataset.pflav)];
     if(fp){
@@ -2874,7 +2897,7 @@ function shopSnapshot(){
     return o;
   });
   return {deliveryFee:num(S.deliveryFee),flavors:S.flavors.slice(),
-    products:S.products.map(function(p){return {name:p.name,price:num(p.price),packQty:Math.max(1,Number(p.packQty)||1),flavored:!!p.flavored,flavors:p.flavored?offered(p):[],greek:GREEK.test(p.name),kg:Number(p.kg)||0,color:p.color==null?null:p.color};}),
+    products:S.products.map(function(p){return {name:p.name,price:num(p.price),packQty:Math.max(1,Number(p.packQty)||1),flavored:!!p.flavored,flavors:p.flavored?offered(p):[],greek:GREEK.test(p.name),kg:Number(p.kg)||0,color:p.color==null?null:p.color,off:!!p.off};}),
     batches:batches};
 }
 function webPublish(){

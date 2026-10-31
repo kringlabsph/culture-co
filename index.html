@@ -136,6 +136,9 @@ section{padding:110px 0}
 .soldout,.leftn{display:inline-block;margin-top:8px;font-size:13px;font-weight:800;border-radius:999px;padding:4px 12px}
 .leftn{background:var(--paper);color:var(--forest)}
 .soldout{background:var(--blush);color:#8f2f48}
+.prod.off .ph img{filter:grayscale(1);opacity:.55}
+.prod.off h3,.prod.off .size{opacity:.6}
+.prod .offtag{position:absolute;right:16px;top:16px;background:#8f2f48;color:#fff;font-weight:800;font-size:13px;padding:7px 14px;border-radius:999px}
 .setnote{font-size:14px;font-weight:700;color:#a52a4a;margin-top:10px}
 .setnote.ok{color:var(--forest)}
 .step button:disabled{opacity:.35;cursor:not-allowed}
@@ -601,6 +604,7 @@ const batches = () => (live ? (shop.batches || []) : fallbackBatches()).filter(b
 const batchOf = d => batches().find(b => b.date === d) || null;
 const isSet = p => (p.packQty || 1) > 1;
 function leftFor(p){            // pieces left for the chosen day, or Infinity if Desk isn't limiting it
+  if (p.off) return 0;
   const b = batchOf(selBatch);
   if (!b || !b.left || typeof b.left[p.name] !== "number") return Infinity;
   return b.left[p.name];
@@ -666,7 +670,7 @@ function renderBatches(){
   const all = batches().slice(0, 6);
   if (!all.some(b => b.date === selBatch)) selBatch = (list.find(b => Object.values(b.left || {}).some(v => v > 0) || !Object.keys(b.left || {}).length) || list[0]).date;
   $("days").innerHTML = list.map(b => {
-    const rows = shop.products.filter(p => b.left && typeof b.left[p.name] === "number");
+    const rows = shop.products.filter(p => !p.off && b.left && typeof b.left[p.name] === "number");
     const total = rows.reduce((a,p) => a + b.left[p.name], 0);
     const full = rows.length && total <= 0;
     return `<button type="button" class="day ${full ? "full" : ""}" data-date="${b.date}" aria-pressed="${b.date === selBatch}">
@@ -703,7 +707,7 @@ function renderMenu(){
   $("menuList").innerHTML = shop.products.map((p, i) => {
     const [, src, alt] = photoOf(p.name), used = usedOf(i), room = poolRoom(p), left = Math.min(leftFor(p), used + room), canAdd = used < Math.min(left, 60);
     const unit = isSet(p) ? (/drink/i.test(p.name) ? "bottles" : "cups") : "tubs";
-    const stock = left === Infinity ? "" : left <= 0 ? `<span class="soldout">Sold out for ${esc(fmtShort(selBatch))}</span>` : `<span class="leftn">${left - used} ${unit} left for ${esc(fmtShort(selBatch))}</span>`;
+    const stock = p.off ? `<span class="soldout">Not available right now</span>` : left === Infinity ? "" : left <= 0 ? `<span class="soldout">Sold out for ${esc(fmtShort(selBatch))}</span>` : `<span class="leftn">${left - used} ${unit} left for ${esc(fmtShort(selBatch))}</span>`;
     let rows;
     if (p.flavored && p.flavors.length){
       rows = p.flavors.map(f => `<div class="flv"><span class="sw" style="background:${flavColor(f)}"></span><span class="fn">${esc(f)}</span>${isSet(p) ? "" : `<span class="fp">${peso(p.price)}</span>`}${stepper(`p${i}|${f}`, `${title(p.name)} ${f}`, cart[`p${i}|${f}`] || 0, canAdd)}</div>`).join("");
@@ -711,8 +715,8 @@ function renderMenu(){
       rows = `<div class="flv"><span class="fn">${isSet(p) ? "Pieces" : "Quantity"}</span><span class="fp">${peso(p.price)}</span>${stepper(`p${i}`, title(p.name), cart[`p${i}`] || 0, canAdd)}</div>`;
     }
     const setNote = isSet(p) ? (() => { const r = used % p.packQty; return r ? `<p class="setnote">Add ${p.packQty - r} more to finish a set of ${p.packQty}.</p>` : used ? `<p class="setnote ok">${used / p.packQty} set${used / p.packQty === 1 ? "" : "s"} of ${p.packQty}, ${peso(used / p.packQty * p.price)}</p>` : ""; })() : "";
-    return `<article class="prod rv ${i % 2 ? "d-1" : ""} in">
-      <div class="ph"><img src="${src}" alt="${esc(alt)}" loading="lazy">${isSet(p) ? `<span class="deal">${p.packQty} for ${peso(p.price)}, mix flavors</span>` : ""}</div>
+    return `<article class="prod rv ${i % 2 ? "d-1" : ""} in${p.off ? " off" : ""}">
+      <div class="ph"><img src="${src}" alt="${esc(alt)}" loading="lazy">${isSet(p) && !p.off ? `<span class="deal">${p.packQty} for ${peso(p.price)}, mix flavors</span>` : ""}${p.off ? `<span class="offtag">Unavailable</span>` : ""}</div>
       <div class="body">
         <div class="top"><h3>${esc(title(p.name))}</h3><span class="size">${esc(sizeOf(p.name))}</span></div>
         ${stock}
@@ -753,7 +757,7 @@ function calc(){
     } else {
       items.push({ product: p.name, qty: used, price: p.price }); subtotal += used * p.price;
     }
-    const left = leftFor(p); if (used > left) problems.push(`${title(p.name)}: only ${left} left for ${fmtShort(selBatch)}.`);
+    const left = leftFor(p); if (p.off) problems.push(`${title(p.name)} is not available right now. Please remove it.`); else if (used > left) problems.push(`${title(p.name)}: only ${left} left for ${fmtShort(selBatch)}.`);
   });
   const L = poolL(); if (L != null && poolUsed() > L + 1e-9) problems.push(`Cups and drinks together are more than we have for ${fmtShort(selBatch)}. Remove a few and try again.`);
   const fee = fulfilment === "delivery" && items.length ? Number(shop.deliveryFee ?? 20) : 0;
@@ -938,6 +942,7 @@ try {
   try { const last = localStorage.getItem("cc_last"); if (last) watch(last, true); } catch {}
   store.watchShop(data => {
     if (data && Array.isArray(data.products) && data.products.length){ shop = data; live = true; }
+    shop.products.forEach((p, i) => { if (p.off) for (const k of Object.keys(cart)) if (k === "p"+i || k.startsWith("p"+i+"|")) delete cart[k]; });
     renderBatches(); renderMenu(); update();
   });
 } catch(e){ console.error(e); }
