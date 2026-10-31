@@ -244,7 +244,20 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 .invtbl tr.today td{font-weight:700;background:var(--bg)}
 .invtbl td.neg{color:var(--bad)}
 .invtbl td.dim{color:var(--muted)}
-.stockcar .cslide>.card{margin:0}
+.stkrow{padding:12px 0 4px;border-top:1px solid var(--line)}
+.stkrow[hidden]{display:none}
+.stkhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.stkname{font-weight:600}
+.stkbig{font-size:26px;font-weight:700;white-space:nowrap}
+.stkbig small{font-size:13px;font-weight:500;color:var(--muted,#6b7280)}
+.stkbig.neg{color:#b42318}
+.stkrow p{margin:2px 0 0}
+.stkadd{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.stkadd input{width:110px}
+.stklink{background:none;border:0;padding:0;font:inherit;color:#1F4D3A;text-decoration:underline;cursor:pointer}
+.stklinks{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:8px}
+.stkpanel{margin-top:10px}
+.stkpanel h3{font-size:15px;margin:12px 0 4px}
 .invcount{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .invcount input{width:110px}
 .capweek{display:flex;flex-wrap:wrap;gap:8px}
@@ -375,29 +388,13 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 
   <!-- PRODUCTION -->
   <section class="tab" id="tab-production" hidden>
-    <div class="stockcar">
-    <div class="bnav" id="cnav-stk"><button type="button" class="arw" data-act="carprev" data-car="stk" aria-label="Previous stock card">&#8249;</button><div class="bdots"><button type="button" data-act="cardot" data-car="stk" data-i="0" aria-label="Show Greek yogurt"></button><button type="button" data-act="cardot" data-car="stk" data-i="1" aria-label="Show Yogurt and drinks"></button></div><span class="bpos" id="cpos-stk"></span><button type="button" class="arw" data-act="carnext" data-car="stk" aria-label="Next stock card">&#8250;</button></div>
-    <div class="bcar"><div class="btrack" id="ctrack-stk" aria-roledescription="carousel" aria-label="Stock">
-    <div class="cslide" data-ck="greek">
-    <div class="card" id="invCard">
-      <div class="cardhead"><h2>Greek yogurt</h2><span class="pill acc" id="invNow"></span></div>
-      <div class="tiles" id="invTiles"></div>
-      <div id="invCountBox"></div>
-      <div class="scroll"><table class="stocktbl invtbl" id="invTable"></table></div>
-      <p class="muted small" id="invNote"></p>
-    </div>
-    </div>
-    <div class="cslide" data-ck="yog">
-    <div class="card" id="yogCard">
-      <div class="cardhead"><h2>Yogurt and drinks</h2><span class="pill acc" id="yogNow"></span></div>
-      <div class="tiles" id="yogTiles"></div>
-      <p class="muted small" id="yogMakes" style="margin:0"></p>
-      <div id="yogCountBox"></div>
-      <div class="scroll"><table class="stocktbl invtbl" id="yogTable"></table></div>
-      <p class="muted small" id="yogNote"></p>
-    </div>
-    </div>
-    </div></div>
+    <div class="card" id="stockCard">
+      <div class="cardhead"><h2>Stock</h2></div>
+      <div class="stkrow" id="stkG"></div>
+      <div class="stkrow" id="stkY"></div>
+      <div class="stklinks"><button type="button" class="btn small quiet" data-act="stkpanel" data-p="stkFix" aria-expanded="false">Fix a count &#8250;</button><button type="button" class="btn small quiet" data-act="stkpanel" data-p="stkNext" aria-expanded="false">Next days &#8250;</button></div>
+      <div class="stkpanel" id="stkFix" hidden></div>
+      <div class="stkpanel" id="stkNext" hidden></div>
     </div>
     <div class="card">
       <h2>Schedule</h2>
@@ -1865,29 +1862,64 @@ function greekAvail(D){
   for(var d=D;d<=m.last;d=addDays(d,1)){var e=m.rows[d]?m.rows[d].end:invEnd(d);if(e<min)min=e;}
   return Math.max(0,min===Infinity?invEnd(D):min);
 }
-function renderInventory(){
-  var card=$('invCard');if(!card||!greekProd())return;
-  var today=ymd(new Date()),m=invMap(),t=m.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
-  var hasData=Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
-  $('invNow').textContent=Math.max(0,greekAvail(today))+' free after all orders';
-  $('invTiles').innerHTML=tile(t.start,'Carried over')+tile(t.made?'+'+t.made:'0','Packed today')+tile(t.out?'−'+t.out:'0','Orders today')+tile(t.end,'Left, carries to tomorrow',t.end<0?'neg':'');
-  var cb=$('invCountBox');
-  if(!cb.contains(document.activeElement)){
-    var mset=invMadeSet()[today],lset=invLeft()[today];
-    cb.innerHTML='<div class="invcount"><div class="field"><label for="invMadeIn">Packed today</label><input id="invMadeIn" type="number" min="0" step="1" inputmode="numeric" placeholder="'+t.made+'" value="'+(mset!=null?mset:'')+'"></div>'
-      +'<div class="field"><label for="invCount">Left tonight (counted)</label><input id="invCount" type="number" min="0" step="1" inputmode="numeric" placeholder="'+t.end+'" value="'+(lset!=null?lset:'')+'"></div>'
-      +'<button type="button" class="btn small" data-act="invsave">Save</button>'+(t.counted||mset!=null?'<button type="button" class="btn small quiet" data-act="invclear">Undo today</button>':'')+'</div>'
-      +'<p class="muted small" style="margin:4px 0 0">'+(hasData?'Packed today: Greek tubs you packed today. Left tonight: only if you count your fridge and the number is different; it replaces what Desk worked out.':'Start here: count the Greek tubs in your fridge and type it in Left tonight. After that, just type Packed today on days you pack.')+'</p>';
+function renderInventory(){renderStock();}
+function stkTable(rows,fmt,today){
+  return '<div class="scroll"><table class="stocktbl invtbl"><thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
+    +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+fmt(r.start)+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+fmt(r.made):'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+fmt(r.out):'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+fmt(r.end)+'</td></tr>';}).join('')+'</tbody></table></div>';
+}
+function stkDays(map,today){
+  var rows=[];
+  for(var d=today;d<=addDays(today,7);d=addDays(d,1)){var r=map.rows[d];if(!r)continue;if(d>today&&!r.made&&!r.out&&!isDeliv(d))continue;rows.push(r);}
+  return rows;
+}
+function renderStock(){
+  var card=$('stockCard');if(!card)return;
+  var today=ymd(new Date()),hasG=!!greekProd(),hasY=S.products.some(function(p){return isPool(p.name);});
+  card.hidden=!hasG&&!hasY;
+  var gt=null,yt=null,gOn=false,yOn=false;
+  /* ---- Greek ---- */
+  var g=$('stkG');g.hidden=!hasG;
+  if(hasG&&!(g.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
+    var gm=invMap();gt=gm.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
+    gOn=Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
+    var gFree=Math.max(0,greekAvail(today)),gSet=invMadeSet()[today];
+    g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gt.end<0?' neg':'')+'">'+(gOn?gFree+' <small>tubs free</small>':'<small>Not counted yet</small>')+'</span></div>'
+      +(gOn?'<p class="muted small">Today: '+gt.start+' carried + '+gt.made+' packed − '+gt.out+' orders = <strong'+(gt.end<0?' class="neg"':'')+'>'+gt.end+' tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the Greek tubs in your fridge.</p>')
+      +'<div class="stkadd"><input id="gAdd" type="number" min="1" step="1" inputmode="numeric" placeholder="+ Packed" aria-label="Greek tubs packed today"><button type="button" class="btn small" data-act="stkadd" data-k="g">Add</button>'
+      +(gSet!=null?'<span class="muted small">'+gSet+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>';
   }
-  var rows=[],d0=addDays(today,-3);
-  for(var d=d0;d<=addDays(today,7);d=addDays(d,1)){
-    var r=m.rows[d];if(!r)continue;
-    if(d>today&&!r.made&&!r.out&&!isDeliv(d))continue;
-    rows.push(r);
+  /* ---- regular yogurt (liters) ---- */
+  var y=$('stkY');y.hidden=!hasY;
+  if(hasY&&!(y.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
+    var ym=yogMap();yt=ym.rows[today]||{start:yogEnd(addDays(today,-1)),made:0,out:0,end:yogEnd(today),counted:false};
+    yOn=yogActive();var yFree=yogAvail(today),ySet=yogMadeSet()[today];
+    var ps=S.products.filter(function(p){return isPool(p.name);}),big=ps.filter(function(p){return kgOf(p.name)>=0.3;})[0],small=ps.filter(function(p){return kgOf(p.name)<0.3;})[0];
+    var makes=yOn&&yFree>0?'≈ '+[big?Math.floor(yFree/kgOf(big.name)+1e-9)+' × '+(/@\s*(.+)$/.exec(big.name)||[,'tubs'])[1]+' tubs':'',small?Math.floor(yFree/kgOf(small.name)+1e-9)+' drinks or minis':''].filter(Boolean).join(' or '):'';
+    y.innerHTML='<div class="stkhead"><span class="stkname">Yogurt &amp; drinks</span><span class="stkbig'+(yt.end<0?' neg':'')+'">'+(yOn?r1(yFree)+' <small>L free</small>':'<small>Not counted yet</small>')+'</span></div>'
+      +(makes?'<p class="muted small">'+esc(makes)+'</p>':'')
+      +(yOn?'<p class="muted small">Today: '+r1(yt.start)+' carried + '+r1(yt.made)+' made − '+r1(yt.out)+' orders = <strong'+(yt.end<0?' class="neg"':'')+'>'+r1(yt.end)+' L tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the liters of regular yogurt you have.</p>')
+      +'<div class="stkadd"><input id="yAdd" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="+ Liters" aria-label="Liters of regular yogurt made today"><button type="button" class="btn small" data-act="stkadd" data-k="y">Add</button>'
+      +(ySet!=null?'<span class="muted small">'+r1(ySet)+' L made today · <button type="button" class="stklink" data-act="stkundo" data-k="y">Undo</button></span>':'')+'</div>';
   }
-  $('invTable').innerHTML='<thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
-    +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+r.start+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+r.made:'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+r.out:'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+r.end+'</td></tr>';}).join('')+'</tbody>';
-  $('invNote').textContent='Carried over + packed today − orders today = left, and what is left carries to tomorrow. Nothing is counted until you type it. The shop sells what is left after all upcoming orders.'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than you have: count your tubs or move an order.':'');
+  /* ---- Fix a count ---- */
+  var fx=$('stkFix');
+  if(!(fx.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
+    var gl=invCounts()[today],yl=yogCounts()[today];
+    fx.innerHTML='<div class="invcount">'
+      +(hasG?'<div class="field"><label for="gFix">Greek tubs left tonight</label><input id="gFix" type="number" min="0" step="1" inputmode="numeric" placeholder="'+(gt?gt.end:'')+'"></div>':'')
+      +(hasY?'<div class="field"><label for="yFix">Yogurt left tonight (L)</label><input id="yFix" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+(yt?r1(yt.end):'')+'"></div>':'')
+      +'<button type="button" class="btn small" data-act="stkfixsave">Save</button>'+(gl!=null||yl!=null?'<button type="button" class="btn small quiet" data-act="stkfixundo">Undo today\'s count</button>':'')+'</div>'
+      +'<p class="muted small">Count what is in the fridge after today\'s orders are out. It replaces what Desk worked out, and tomorrow starts from it. Packed cups and drinks count as liters: 500 g = 0.5 L, a mini or a drink = 0.1 L. Leave a box blank to keep Desk\'s number.</p>';
+  }
+  /* ---- Next days ---- */
+  var nx=$('stkNext'),html='';
+  if(hasG&&gOn)html+='<h3>Greek yogurt (tubs)</h3>'+stkTable(stkDays(invMap(),today),function(v){return v;},today);
+  if(hasY&&yOn){
+    var bl={};yogLines(today).forEach(function(x){bl[x.product]=(bl[x.product]||0)+piecesOf(x);});
+    var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set)');});
+    html+='<h3>Yogurt &amp; drinks (liters)</h3>'+stkTable(stkDays(yogMap(),today),r1,today)+(bk.length?'<p class="muted small">Orders today: '+esc(bk.join(' · '))+'</p>':'');
+  }
+  nx.innerHTML=html?html+'<p class="muted small">Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
 function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};return S.yogMade;}
@@ -1945,36 +1977,7 @@ function yogMakesText(L){
   if(!ps.length||!(L>0))return '';
   return 'That is enough for about '+ps.map(function(p){return Math.floor(L/kgOf(p.name)+1e-9)+' × '+shortName(p.name);}).join(', or ')+'.';
 }
-function renderYogInventory(){
-  var card=$('yogCard');if(!card)return;
-  var pool=S.products.some(function(p){return isPool(p.name);});
-  card.hidden=!pool;if(!pool)return;
-  var today=ymd(new Date()),m=yogMap(),t=m.rows[today]||{start:yogEnd(addDays(today,-1)),made:0,out:0,end:yogEnd(today),counted:false};
-  var on=yogActive(),free=yogAvail(today);
-  $('yogNow').textContent=on?fmtL(free)+' free after all orders':'Not tracking yet';
-  $('yogTiles').innerHTML=tile(fmtL(t.start),'Carried over')+tile(t.made?'+'+fmtL(t.made):'0 L','Made today')+tile(t.out?'−'+fmtL(t.out):'0 L','Orders today')+tile(fmtL(t.end),'Left, carries to tomorrow',t.end<0?'neg':'');
-  var bl={};yogLines(today).forEach(function(x){var k=x.product;bl[k]=(bl[k]||0)+piecesOf(x);});
-  var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set for this product)');});
-  $('yogMakes').textContent=(bk.length?'Orders today: '+bk.join(' · ')+'. ':'')+(on?yogMakesText(free):'');
-  var cb=$('yogCountBox');
-  if(!cb.contains(document.activeElement)){
-    var ymset=yogMadeSet()[today],ylset=yogLeft()[today];
-    cb.innerHTML='<div class="invcount"><div class="field"><label for="yogMadeIn">Made today (L)</label><input id="yogMadeIn" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+r1(t.made)+'" value="'+(ymset!=null?ymset:'')+'"></div>'
-      +'<div class="field"><label for="yogCount">Left tonight (L, counted)</label><input id="yogCount" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+r1(t.end)+'" value="'+(ylset!=null?ylset:'')+'"></div>'
-      +'<button type="button" class="btn small" data-act="yogsave">Save</button>'+(t.counted||ymset!=null?'<button type="button" class="btn small quiet" data-act="yogclear">Undo today</button>':'')+'</div>'
-      +'<p class="muted small" style="margin:4px 0 0">'+(on?'Made today: liters of regular yogurt you made today. Left tonight: only if you measure and it is different; packed cups and drinks count too (500 g = 0.5 L, mini or drink = 0.1 L).':'Start here: measure the regular yogurt you have (packed cups and drinks count too) and type it in Left tonight.')+'</p>';
-  }
-  var rows=[];
-  for(var d=addDays(today,-3);d<=addDays(today,7);d=addDays(d,1)){
-    var r=m.rows[d];if(!r)continue;
-    if(d>today&&!r.made&&!r.out&&!isDeliv(d))continue;
-    rows.push(r);
-  }
-  $('yogTable').innerHTML=on?'<thead><tr><th>Day</th><th>Start</th><th>Made</th><th>Orders</th><th>Left</th></tr></thead><tbody>'
-    +rows.map(function(r){return '<tr class="'+(r.d===today?'today':'')+'"><td>'+esc(dateLabel(r.d))+(isDeliv(r.d)?' <span class="muted small">delivery</span>':'')+'</td><td'+(r.counted?' title="Counted"':'')+'>'+r1(r.start)+(r.counted?' ✓':'')+'</td><td'+(r.made?'':' class="dim"')+'>'+(r.made?'+'+r1(r.made):'0')+'</td><td'+(r.out?'':' class="dim"')+'>'+(r.out?'−'+r1(r.out):'0')+'</td><td class="'+(r.end<0?'neg':'')+'">'+r1(r.end)+'</td></tr>';}).join('')+'</tbody>':'';
-  setTimeout(function(){carSync('stk');},0);
-  $('yogNote').textContent=on?'In liters. Carried over + made today − orders today = left, and what is left carries to tomorrow. Nothing is counted until you type it. All cups and drinks share the same liters (500 g = 0.5 L, mini or drink = 0.1 L).'+(rows.some(function(r){return r.end<0;})?' A red number means more is promised than you have: measure, or move an order.':''):'Plain yogurt, flavored yogurt, minis and drinks all come from your regular yogurt. Type what you have in Left tonight to start.';
-}
+function renderYogInventory(){}
 function stockFor(date,name){
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
   var o=S.capacity.stock[date];if(o&&typeof o[name]==='number')return o[name];
@@ -2485,6 +2488,22 @@ document.addEventListener('click',function(e){
   else if(a==='bprev')runGo(runIdx()-1);
   else if(a==='bnext')runGo(runIdx()+1);
   else if(a==='bdot')runGo(Number(t.dataset.i));
+  else if(a==='stkpanel'){var pn=$(t.dataset.p);if(pn){pn.hidden=!pn.hidden;t.setAttribute('aria-expanded',String(!pn.hidden));}}
+  else if(a==='stkadd'){
+    var isG=t.dataset.k==='g',inp=$(isG?'gAdd':'yAdd'),av=Number(inp.value),ad=ymd(new Date());
+    if(!(av>0)){toast(isG?'Type how many Greek tubs you packed.':'Type the liters you made.');inp.focus();return;}
+    var set=isG?invMadeSet():yogMadeSet();set[ad]=isG?Math.round((Number(set[ad])||0)+av):r2((Number(set[ad])||0)+av);
+    saveSettings();inp.value='';if(document.activeElement)document.activeElement.blur();renderAll();toast(isG?'Added '+Math.round(av)+' Greek tubs.':'Added '+r1(av)+' L.');}
+  else if(a==='stkundo'){var ud=ymd(new Date());delete (t.dataset.k==='g'?invMadeSet():yogMadeSet())[ud];saveSettings();renderAll();toast('Removed today\'s '+(t.dataset.k==='g'?'packed tubs.':'liters.'));}
+  else if(a==='stkfixsave'){
+    var fg=$('gFix'),fy=$('yFix'),fgv=fg?fg.value:'',fyv=fy?fy.value:'',fd=ymd(new Date());
+    if(fgv===''&&fyv===''){toast('Type a count first.');return;}
+    if((fgv!==''&&!(Number(fgv)>=0))||(fyv!==''&&!(Number(fyv)>=0))){toast('Use numbers, 0 or more.');return;}
+    /* the count is what is left after today's orders; Desk stores it as today's starting point, so tubs packed later still add on top */
+    if(fgv!==''){delete invTotals()[fd];delete invLeft()[fd];delete invCounts()[fd];invCache=null;var gr=invMap().rows[fd],gmade=gr?gr.made:invMade(fd),gout=gr?gr.out:invOut(fd);invCounts()[fd]=Math.round(Number(fgv))-gmade+gout;}
+    if(fyv!==''){delete yogTotals()[fd];delete yogLeft()[fd];delete yogCounts()[fd];yogCache=null;yogCounts()[fd]=r2(Number(fyv)-yogMade(fd)+yogOut(fd));}
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Count saved.');}
+  else if(a==='stkfixundo'){var fu=ymd(new Date());delete invLeft()[fu];delete yogLeft()[fu];delete invCounts()[fu];delete yogCounts()[fu];delete invTotals()[fu];delete yogTotals()[fu];saveSettings();renderAll();toast('Today\'s count removed.');}
   else if(a==='invsave'){
     var iv=$('invCount').value,mv=$('invMadeIn').value,td=ymd(new Date());
     if(iv===''&&mv===''){toast('Type Packed today, Left tonight, or both.');return;}
@@ -3068,7 +3087,6 @@ $('eDate').value=ymd(new Date());
 
 lsLoad();
 renderAll();
-carInit('stk','greek');
 show(TABS.indexOf(location.hash.slice(1))>=0?location.hash.slice(1):'production');
 })();
 </script>
