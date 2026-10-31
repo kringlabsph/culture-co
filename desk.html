@@ -2881,10 +2881,10 @@ function webMsg(n){
     +'If you already paid, we\'ll refund you in full. Reply here if you\'d like us to book you for another day.\nSorry for the trouble, and thank you!';
   if(n.kind==='rescheduled')return 'Hi '+first+'! A quick update on your Culture Co. pre-order'+no+'. We moved it to a new day.\n'
     +'New '+how.toLowerCase()+' date: '+longDate(n.d)+'\n'
-    +'Total stays '+money(o.total)+'.'+track+'\nIf the new date doesn\'t work for you, just reply here. Thank you!';
+    +'Total stays '+money(o.items?webTotal(o):o.total)+'.'+track+'\nIf the new date doesn\'t work for you, just reply here. Thank you!';
   return 'Hi '+first+'! Your Culture Co. pre-order'+no+' is confirmed.\n'
     +how+': '+longDate(n.d)+'\n'
-    +'Total: '+money(o.total)
+    +'Total: '+money(o.items?webTotal(o):o.total)
     +track+'\nThank you!';
 }
 var NOTE_LS='cc-desk-notes',NOTE_LABEL={approved:'Approved',declined:'Declined',cancelled:'Cancelled',rescheduled:'Moved'};
@@ -2944,15 +2944,27 @@ function webListen(){
       webBeep();
       var o=webOrders.find(function(x){return x.id===fresh[0];});
       toast('New online order'+(o?' from '+o.name:''));
-      if(o)deskNotify('New online order #'+o.queueNumber,o.name+' · '+money(o.total),'web-'+o.id);
+      if(o)deskNotify('New online order #'+o.queueNumber,o.name+' · '+money(webTotal(o)),'web-'+o.id);
     }
   },function(e){$('webList').innerHTML=emptyBox('Online orders could not load ('+esc(e.code||'error')+'). Check that you are signed in with the shop account.');});
 }
 function webLines(o){
   return (o.items||[]).map(function(it){
-    var l={product:it.product,qty:num(it.qty),price:num(it.price),pack:it.pack>1?it.pack:undefined,flavors:it.flavors||undefined};
+    /* price always comes from Desk's own product list, never from what the customer's browser sent */
+    var dp=prodMatch(it.product),sent=num(it.price);
+    var l={product:it.product,qty:num(it.qty),price:dp?num(dp.price):sent,pack:it.pack>1?it.pack:undefined,flavors:it.flavors||undefined};
+    if(!dp)l.unknown=true;else if(sent!==num(dp.price))l.sentPrice=sent;
     return l;
   });
+}
+function webFee(o){return o.fulfilment==='delivery'?num(S.deliveryFee):0;}
+function webTotal(o){return sum(webLines(o),function(l){return l.qty*l.price;})+webFee(o);}
+function webPriceNote(o){
+  var lines=webLines(o),unk=lines.filter(function(l){return l.unknown;}),tot=webTotal(o),sent=num(o.total);
+  var out=[];
+  if(unk.length)out.push(esc(unk.map(function(l){return l.product;}).join(', '))+' is not in your Desk products, so its price could not be checked.');
+  if(Math.abs(sent-tot)>0.009)out.push('Price check: the shop page sent '+money(sent)+', but your Desk prices make it '+money(tot)+'. Desk prices are used when you approve. If you changed prices recently this is normal; otherwise the order may have been tampered with.');
+  return out.length?'<p class="small left0">'+out.join(' ')+'</p>':'';
 }
 function webAdd(lines){var add={};lines.forEach(function(l){var k=prodKey(l.product);add[k]=(add[k]||0)+piecesOf(l);});return add;}
 function webCheck(o,bd){
@@ -2978,8 +2990,8 @@ function renderWeb(){
     return {key:o.id,label:'#'+o.queueNumber+' '+o.name,html:'<div class="batch" data-web="'+esc(o.id)+'">'
       +'<div class="bhead"><div><h3>#'+esc(o.queueNumber)+' '+esc(o.name)+'</h3><span class="muted small">'+esc(t)+' · '+esc(o.id)+'</span></div><span class="pill '+(o.fulfilment==='delivery'?'warn':'acc')+'">'+(o.fulfilment==='delivery'?'Delivery':'Pickup')+'</span></div>'
       +'<div class="olines">'+lines.map(function(l){return '<div class="ol"><span>'+prodDot(l.product)+esc(qtyText(l))+' × '+esc(l.product)+esc(flavInline(l))+'</span><span>'+money(l.qty*l.price)+'</span></div>';}).join('')
-      +(o.deliveryFee?'<div class="ol"><span>Delivery fee</span><span>'+money(o.deliveryFee)+'</span></div>':'')
-      +'<div class="ol"><strong>Total</strong><strong>'+money(o.total)+'</strong></div></div>'
+      +(webFee(o)?'<div class="ol"><span>Delivery fee</span><span>'+money(webFee(o))+'</span></div>':'')
+      +'<div class="ol"><strong>Total</strong><strong>'+money(webTotal(o))+'</strong></div></div>'+webPriceNote(o)
       +'<p class="small"><b>Contact:</b> '+esc(o.contact)+(o.address?'<br><b>Address:</b> '+esc(o.address):'')+(o.notes?'<br><b>Notes:</b> '+esc(o.notes):'')+(pref?'<br><b>Prefers:</b> '+esc(delivLabel(pref)):'')+'</p>'
       +'<div class="form">'
       +'<div class="field"><label>'+(o.fulfilment==='delivery'?'Delivery':'Pickup')+' date</label><input type="date" data-webd="'+esc(o.id)+'" value="'+esc(dd)+'"></div></div>'
@@ -3000,7 +3012,7 @@ function approveWeb(id){
   lines.forEach(function(l,i){
     chain=chain.then(function(){return put('reservations',{id:uid(),group:g,date:f.d,batchDate:f.b,customer:o.name,product:l.product,qty:l.qty,price:l.price,pack:l.pack,flavors:l.flavors,delivery:del||undefined,note:note,status:'reserved',created:base+i,webId:o.id},true);});
   });
-  if(del&&o.deliveryFee>0)chain=chain.then(function(){return put('reservations',{id:uid(),group:g,date:f.d,batchDate:f.b,customer:o.name,product:'Delivery fee',qty:1,price:num(o.deliveryFee),fee:true,delivery:true,note:note,status:'reserved',created:base+lines.length,webId:o.id},true);});
+  if(del&&webFee(o)>0)chain=chain.then(function(){return put('reservations',{id:uid(),group:g,date:f.d,batchDate:f.b,customer:o.name,product:'Delivery fee',qty:1,price:webFee(o),fee:true,delivery:true,note:note,status:'reserved',created:base+lines.length,webId:o.id},true);});
   chain.then(function(){return web.fs.collection('orders').doc(id).update({status:'approved',batchId:f.b,date:f.d,batchLabel:batchName(f.b)||'Batch',deskGroup:g});})
     .then(function(){delete webSel[id];addCustNote({o:Object.assign({id:id},o),kind:'approved',b:f.b,d:f.d});renderAll();toast('Approved #'+o.queueNumber+'. Now let them know.');})
     .catch(function(){toast('Could not approve. Check your connection and try again.');});
