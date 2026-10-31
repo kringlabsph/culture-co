@@ -581,7 +581,7 @@ const peso = n => "₱" + Number(n || 0).toLocaleString("en-PH");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-const fmtDay = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"long" });
+const fmtDay = d => d === ymd(new Date()) ? "Today" : new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"long" });
 const fmtShort = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ weekday:"short", month:"short", day:"numeric" });
 const fmtDate = d => new Date(d+"T00:00").toLocaleDateString("en-PH",{ month:"long", day:"numeric" });
 const title = n => String(n).replace(/\s*\(.*?\)\s*/g," ").replace(/\s*@.*$/,"").replace(/\s+/g," ").trim();
@@ -600,7 +600,8 @@ function fallbackBatches(){
   }
   return out;
 }
-const batches = () => (live ? (shop.batches || []) : fallbackBatches()).filter(b => b.date >= ymd(new Date()));
+/* same-day ("Today") is only offered until 6 PM */
+const batches = () => (live ? (shop.batches || []) : fallbackBatches()).filter(b => b.date >= ymd(new Date()) && !(b.sameDay && (b.date !== ymd(new Date()) || new Date().getHours() >= 18)));
 const batchOf = d => batches().find(b => b.date === d) || null;
 const isSet = p => (p.packQty || 1) > 1;
 function leftFor(p){            // pieces left for the chosen day, or Infinity if Desk isn't limiting it

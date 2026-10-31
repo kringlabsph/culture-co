@@ -574,7 +574,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <form id="resForm" autocomplete="off" style="display:flex;flex-direction:column;gap:12px">
         <div class="form">
           <div class="field wide"><label for="rCustomer">Customer name</label><input id="rCustomer" data-combo="customers" maxlength="60" required></div>
-          <div class="field"><label for="rDate">Pickup or delivery day</label><select id="rDate" required></select><span class="muted small">Mon, Wed or Fri only</span></div>
+          <div class="field"><label for="rDate">Pickup or delivery day</label><select id="rDate" required></select><span class="muted small">Today or a delivery day</span></div>
           <div class="field wide" hidden><label for="rBatch">Delivery day</label><select id="rBatch"></select></div>
           <div class="field"><label for="rMode">Pickup or delivery</label><select id="rMode"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></div>
           <div class="field" id="rFeeWrap" hidden><label for="rFee">Delivery fee (<span class="cur">&#8369;</span>)</label><input id="rFee" type="number" min="0" step="any" inputmode="decimal"></div>
@@ -2040,9 +2040,9 @@ document.addEventListener('toggle',function(e){var d=e.target;if(d&&d.dataset&&d
 document.addEventListener('toggle',function(e){var t=e.target&&e.target.closest&&e.target.closest('.btrack'),sl=e.target.closest&&e.target.closest('.cslide,.batch');if(t&&sl)fitTrack(t,sl);},true);
 function fillResDates(){
   var sel=$('rDate');if(!sel||document.activeElement===sel)return;
-  var cur=sel.value,ds=batchDates(),today=ymd(new Date());
+  var cur=sel.value,today=ymd(new Date()),ds=batchDates().filter(function(k){return k!==today;});ds.unshift(today);
   sel.innerHTML=ds.map(function(k){return '<option value="'+k+'">'+esc(longDate(k)+(k===today?' (today)':''))+'</option>';}).join('');
-  if(cur&&ds.indexOf(cur)>=0)sel.value=cur;else if(ds.length)sel.value=ds.find(function(k){return k>today;})||ds[0];
+  if(cur&&ds.indexOf(cur)>=0)sel.value=cur;else sel.value=today;
 }
 function autoBatch(){
   if(batchManual)return;
@@ -2949,6 +2949,13 @@ function renderWebNotes(){
       +'<button type="button" class="btn small quiet" data-act="webdone" data-i="'+i+'">Done</button></div></div>';
   }).join('');
 }
+/* today, for customers who want same-day pickup or delivery from what is already in the fridge (not from expected batches) */
+function todayOffer(){
+  var k=ymd(new Date());if(capFor(k)>0)return null;
+  var left={},any=false,gt=invMap().rows[k],gReal=gt?gt.end-invExpected(k):0,g=Math.max(0,Math.min(greekAvail(k),gReal)),yl=yogActive()?yogAvail(k):0;
+  S.products.forEach(function(p){var n=0;if(GREEK.test(p.name))n=g;else if(isPool(p.name))n=Math.floor(yl/kgOf(p.name)+1e-9);if(p.off)n=0;left[p.name]=Math.max(0,n);if(n>0)any=true;});
+  return any?{date:k,label:'Today',left:left,sameDay:true,yogL:yl}:null;
+}
 function shopSnapshot(){
   var batches=batchDates().slice(0,6).map(function(k){
     var left={};
@@ -2959,7 +2966,7 @@ function shopSnapshot(){
   });
   return {deliveryFee:num(S.deliveryFee),flavors:S.flavors.slice(),
     products:S.products.map(function(p){return {name:p.name,price:num(p.price),packQty:Math.max(1,Number(p.packQty)||1),flavored:!!p.flavored,flavors:p.flavored?offered(p):[],greek:GREEK.test(p.name),kg:Number(p.kg)||0,color:p.color==null?null:p.color,off:!!p.off};}),
-    batches:batches};
+    batches:(function(){var t=todayOffer();return t?[t].concat(batches):batches;})()};
 }
 function webPublish(){
   if(!web)return;
