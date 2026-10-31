@@ -530,7 +530,7 @@ const SITE = {
   orderAlertTopic: "cultureco-yl4c1ni80jlc",
 
   faq: [
-    ["When do you deliver?", "On the delivery days shown near the top of the page. Order by 5 PM the day before; when we have stock in the fridge you can also order for today until 5 PM. Each delivery day has a limited number of tubs, bottles and cups, shown near the top of the page."],
+    ["When do you deliver?", "On the delivery days shown near the top of the page. Order by 5 PM the day before (weekend days stay open the evening before); when we have stock in the fridge you can also order for today until 5 PM. Each delivery day has a limited number of tubs, bottles and cups, shown near the top of the page."],
     ["When will I know my date?", "After you order, we confirm your pickup or delivery date. Check anytime with your order code in Track your order."],
     ["How much is delivery?", "Delivery adds ₱20 to your order. Pickup is free."],
     ["How do the sets of 3 work?", "Drinks and minis come in sets of 3 for ₱100. Mix any flavors in a set, for example 2 strawberry and 1 blueberry."],
@@ -600,13 +600,15 @@ function fallbackBatches(){
   }
   return out;
 }
-/* 5 PM cutoff: today and tomorrow close at 5 PM today; after that the earliest is the delivery day after tomorrow */
+/* 5 PM cutoff: today closes at 5 PM; tomorrow closes at 5 PM today unless tomorrow is Saturday or Sunday */
 const CUTOFF_HOUR = 17;
 function openDay(b){
   const now = new Date(), t = ymd(now), tm = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)), late = now.getHours() >= CUTOFF_HOUR;
   if (b.date < t) return false;
   if (b.sameDay && b.date !== t) return false;
-  if (late && (b.date === t || b.date === tm)) return false;
+  if (late && b.date === t) return false;
+  /* tomorrow closes at 5 PM on weekdays; a Saturday or Sunday tomorrow stays open all evening */
+  if (late && b.date === tm && ![0, 6].includes(new Date(tm + "T00:00").getDay())) return false;
   return true;
 }
 const batches = () => (live ? (shop.batches || []) : fallbackBatches()).filter(openDay);

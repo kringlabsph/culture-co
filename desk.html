@@ -795,13 +795,13 @@ var DEFAULT_STEPS=[
   {label:'Pack the strained yogurt',mins:0,mode:'packday'}
 ];
 function defaults(){return {
-  stepsVersion:2,prodDays:[0,1,2,3,4,5,6],packDays:[1,3,5],startTime:'06:00',batchSeq:0,
+  stepsVersion:2,prodDays:[0,1,2,3,4,5,6],packDays:[1,3,5,6,0],startTime:'06:00',batchSeq:0,
   recipe:{batches:1,waterCups:14,cupMl:250,powderG:875,starterG:125,mixL:4,tubG:350,greekPerBatch:4},greek4:1,
   fill:{type:'greek',plain:'jam',qty:10,tub:{yogurt:500,sugar:30,jam:60},drink:{yogurt:100,water:100,sugar:12,jam:16}},
   steps:DEFAULT_STEPS.map(function(s){return {label:s.label,mins:s.mins,mode:s.mode};}),
   products:[{name:'Greek Yogurt @ 350g',color:0,kg:0.52,price:140,packQty:1,sugarG:0,jamG:0,flavored:false},{name:'Plain Yogurt @ 500g',color:1,kg:0.5,price:120,packQty:1,sugarG:30,jamG:0,flavored:false},{name:'Flavored Yogurt @ 500g',color:2,kg:0.5,price:140,packQty:1,sugarG:30,jamG:60,flavored:true,flavorList:['Strawberry','Blueberry']},{name:'Yogurt Drink (Mix and Match) @ 200ml',color:3,kg:0.1,price:100,packQty:3,sugarG:12,jamG:16,flavored:true},{name:'Yogurt Mini (Mix and Match) @ 100g',color:4,kg:0.1,price:100,packQty:3,sugarG:0,jamG:0,flavored:true}],
   costs:{powder:0,starter:0,sugar:0,jam:0},batchColors:{},packTicks:{},flavors:['Strawberry','Mango','Blueberry'],deliveryFee:20,
-  capacity:{weekly:[0,1,0,1,0,1,0],byDate:{},tubs:{},weeklyTubs:{},weeklyStock:{},stock:{}}
+  capacity:{weekly:[1,1,0,1,0,1,1],byDate:{},tubs:{},weeklyTubs:{},weeklyStock:{},stock:{}}
 };}
 function merge(a,b){var o=Object.assign({},a);if(b)Object.keys(b).forEach(function(k){o[k]=(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a[k]&&typeof a[k]==='object')?merge(a[k],b[k]):b[k];});return o;}
 var S=defaults();
@@ -859,6 +859,8 @@ function applySettings(d){
   if(!S.capacity.weeklyStock||typeof S.capacity.weeklyStock!=='object')S.capacity.weeklyStock={};
   if(!S.capacity.stock||typeof S.capacity.stock!=='object')S.capacity.stock={};
   if(!Array.isArray(S.capacity.weekly)||S.capacity.weekly.length!==7||S.capacity.weekly.some(function(x){return !isFinite(x);}))S.capacity.weekly=fresh.capacity.weekly.slice();
+  /* one-time: Saturday and Sunday become delivery and pack days (untick them anytime after) */
+  if(!S.weekend1){S.capacity=S.capacity||{};if(!Array.isArray(S.capacity.weekly))S.capacity.weekly=fresh.capacity.weekly.slice();S.capacity.weekly[6]=S.capacity.weekly[6]>0?S.capacity.weekly[6]:1;S.capacity.weekly[0]=S.capacity.weekly[0]>0?S.capacity.weekly[0]:1;[6,0].forEach(function(d){if(S.packDays.indexOf(d)<0)S.packDays.push(d);});S.weekend1=1;}
 }
 function getPath(o,p){return p.split('.').reduce(function(a,k){return a==null?a:a[k];},o);}
 function setPath(o,p,v){var ks=p.split('.'),last=ks.pop();var t=ks.reduce(function(a,k){return a[k];},o);t[last]=v;}
