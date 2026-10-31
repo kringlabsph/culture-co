@@ -1894,13 +1894,26 @@ function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};re
 function yogLeft(){if(!S.yogLeft||typeof S.yogLeft!=='object')S.yogLeft={};return S.yogLeft;}
 function yogTotals(){if(!S.yogTotal||typeof S.yogTotal!=='object')S.yogTotal={};return S.yogTotal;}
 function yogCounts(){if(!S.yogCount||typeof S.yogCount!=='object')S.yogCount={};return S.yogCount;}
-function kgOf(name){var p=prodInfo(name);return p?Number(p.kg)||0:0;}
+/* match an order to a product even if the name was changed or typed a bit differently */
+function prodMatch(name){
+  var p=prodInfo(name);if(p)return p;
+  var n=String(name||'').toLowerCase().trim(),sn=shortName(n),sz=(/@\s*(.+)$/.exec(n)||[,''])[1].replace(/\s+/g,'');
+  p=S.products.find(function(x){return x.name.toLowerCase().trim()===n;})||S.products.find(function(x){return shortName(x.name).toLowerCase()===sn&&sn;});
+  if(p)return p;
+  if(sz){var same=S.products.filter(function(x){return ((/@\s*(.+)$/.exec(x.name.toLowerCase())||[,''])[1]).replace(/\s+/g,'')===sz&&!GREEK.test(x.name)===!GREEK.test(n);});
+    var kind=/drink/.test(n)?'drink':/mini/.test(n)?'mini':'';same=same.filter(function(x){return !kind||x.name.toLowerCase().indexOf(kind)>=0;});if(same.length)return same[0];}
+  return null;
+}
+function kgOf(name){var p=prodMatch(name);if(p)return Number(p.kg)||0;if(GREEK.test(name))return 0;var m=/(\d+(?:\.\d+)?)\s*(g|ml)\b/i.exec(String(name||''));return m?Number(m[1])/1000:0;}
+function yogLines(d){
+  return mem.orders.filter(function(x){return x.date===d&&!x.fee;}).concat(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee;}))
+    .filter(function(x){return !GREEK.test(x.product);});
+}
 function isPool(name){return !GREEK.test(name)&&kgOf(name)>0;}
 function yogActive(){return Object.keys(yogCounts()).length>0||Object.keys(yogLeft()).length>0||Object.keys(yogTotals()).length>0||Object.keys(yogMadeSet()).length>0||mem.batches.some(isRegular);}
 function yogMade(d){var m=yogMadeSet();if(m[d]!=null)return Number(m[d]);return r2(sum(mem.batches.filter(function(b){return isRegular(b)&&invDay(b)===d;}),litersOf));}
 function yogOut(d){
-  var f=function(x){return isPool(x.product)?piecesOf(x)*kgOf(x.product):0;};
-  return r2(sum(mem.orders.filter(function(x){return x.date===d&&!x.fee;}),f)+sum(mem.reservations.filter(function(x){return x.date===d&&x.status==='reserved'&&!x.fee;}),f));
+  return r2(sum(yogLines(d),function(x){return piecesOf(x)*kgOf(x.product);}));
 }
 var yogCache=null,yogCacheKey='';
 function yogMap(){
@@ -1940,7 +1953,9 @@ function renderYogInventory(){
   var on=yogActive(),free=yogAvail(today);
   $('yogNow').textContent=on?fmtL(free)+' free after all orders':'Not tracking yet';
   $('yogTiles').innerHTML=tile(fmtL(t.start),'Carried over')+tile(t.made?'+'+fmtL(t.made):'0 L','Made today')+tile(t.out?'−'+fmtL(t.out):'0 L','Orders today')+tile(fmtL(t.end),'Left, carries to tomorrow',t.end<0?'neg':'');
-  $('yogMakes').textContent=on?yogMakesText(free):'';
+  var bl={};yogLines(today).forEach(function(x){var k=x.product;bl[k]=(bl[k]||0)+piecesOf(x);});
+  var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set for this product)');});
+  $('yogMakes').textContent=(bk.length?'Orders today: '+bk.join(' · ')+'. ':'')+(on?yogMakesText(free):'');
   var cb=$('yogCountBox');
   if(!cb.contains(document.activeElement)){
     var ymset=yogMadeSet()[today],ylset=yogLeft()[today];
