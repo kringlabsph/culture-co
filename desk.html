@@ -3254,7 +3254,7 @@ function renderNeedBanner(){
   if(!ns.length&&!rs.length){el.hidden=true;el.innerHTML='';return;}
   el.hidden=false;
   el.innerHTML='<div class="list">'+ns.map(function(n){var t=needText(n);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">for pre-orders: '+esc(t.what)+' needed by '+esc(dateLabel(n.first))+', '+esc(t.by)+'.</span></span>';}).join('')
-    +rs.map(function(r){var t=regText(r);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">'+esc(t.short)+'.</span></span>';}).join('')+'</div>'
+    +rs.map(function(r){var t=regText(r);return '<span><strong>'+esc(t.title)+':</strong> <span class="muted">'+esc(t.short)+'.</span></span>';}).join('')+'</div>'
     +'<div class="actions">'+(ns.length?'<button type="button" class="btn small" data-act="needstart" data-k="g">Start Greek batch</button>':'')+(rs.length?'<button type="button" class="btn small'+(ns.length?' quiet':'')+'" data-act="needstart" data-k="y">Start regular batch</button>':'')+'<button type="button" class="btn small quiet" data-tab="production" data-to="stockCard">See stock</button></div>';
 }
 var NEED_LS='cc-desk-need';
