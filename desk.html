@@ -580,6 +580,8 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
     <div class="card" id="histCard" hidden>
       <details id="histBox"><summary><span>Order history <span class="muted small" id="histCount"></span></span></summary><div class="inner">
         <p class="muted small">Every order from your website, newest first, including the ones you declined.</p>
+        <div class="chips" id="histPeriod" role="group" aria-label="Period"></div>
+        <div id="histSum"></div>
         <div class="chips" id="histFilter" role="group" aria-label="Show"></div>
         <input type="search" id="histQ" placeholder="Search name, phone or order #" autocomplete="off" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)">
         <div id="histList"></div>
@@ -3299,7 +3301,8 @@ document.addEventListener('click',function(e){
 });
 
 /* ---------- order history: every online order, including declined ---------- */
-var hist={on:false,limit:100,docs:[],f:'all',q:'',unsub:null,arm:{},err:''};
+var hist={on:false,limit:100,docs:[],f:'all',q:'',p:'30',unsub:null,arm:{},err:''};
+var HIST_P=[['7','Last 7 days'],['30','Last 30 days'],['all','All']];
 var HIST_F=[['all','All'],['waiting','Waiting'],['confirmed','Confirmed'],['done','Done'],['declined','Declined'],['cancelled','Cancelled']];
 function histStatus(o){
   var s=o.status==='assigned'?'approved':o.status;
@@ -3321,36 +3324,66 @@ function histListen(){
     hist.err='';hist.docs=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});renderHist();
   },function(e){hist.err=e.code||'error';renderHist();});
 }
+function histInPeriod(o){if(hist.p==='all')return true;var w=histWhen(o);if(!w)return true;var d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(Number(hist.p)-1));return w>=d;}
+function histSummary(list){
+  var by={},val={},pcs={},del=0,pick=0,dow=[0,0,0,0,0,0,0];
+  list.forEach(function(o){
+    var k=histStatus(o).k;by[k]=(by[k]||0)+1;val[k]=(val[k]||0)+histTotal(o);
+    if(o.fulfilment==='delivery')del++;else pick++;
+    var w=histWhen(o);if(w)dow[w.getDay()]++;
+    if(k==='confirmed'||k==='done'||k==='waiting')(o.items||[]).forEach(function(it){var n=shortName(it.product);pcs[n]=(pcs[n]||0)+num(it.qty)*Math.max(1,Number(it.pack)||1);});
+  });
+  var n=list.length,sold=(val.confirmed||0)+(val.done||0),decl=by.declined||0;
+  if(!n)return emptyBox('No orders in this period.');
+  var top=Object.keys(pcs).sort(function(x,y){return pcs[y]-pcs[x];}).map(function(k){return pcs[k]+' × '+k;});
+  var busy=dow.indexOf(Math.max.apply(null,dow));
+  return '<div class="tiles">'+tile(n,'Orders')+tile(money(sold),'Confirmed sales',sold?'pos':'')+tile((by.waiting||0)+(by.waiting?' · '+money(val.waiting):''),'Waiting')+tile(decl+(decl?' · '+money(val.declined):''),'Declined',decl?'neg':'')+tile(by.cancelled||0,'Cancelled')+tile(n?Math.round(decl/n*100)+'%':'0%','Declined rate')+'</div>'
+    +'<p class="small" style="margin:0">'+(top.length?'<b>Ordered:</b> '+esc(top.join(', '))+'<br>':'')+'<b>Pickup</b> '+pick+' · <b>Delivery</b> '+del+(Math.max.apply(null,dow)>0?' · <b>Most orders come in on</b> '+DOW[busy]:'')+'</p>'
+    +(hist.docs.length>=hist.limit&&hist.p==='all'?'<p class="muted small">Based on the latest '+hist.docs.length+' orders. Tap "Show older orders" below to include more.</p>':'');
+}
+function histRow(o){
+  var st=histStatus(o),w=histWhen(o),del=o.fulfilment==='delivery',ph=webPhone(o.contact);
+  var dateTxt=o.date?(del?'Delivery ':'Pickup ')+dateLabel(o.date):o.preferredBatch?(del?'Wanted delivery ':'Wanted pickup ')+dateLabel(o.preferredBatch):(del?'Delivery':'Pickup');
+  var when=o.declinedAt&&st.k==='declined'?' · declined '+new Date(o.declinedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):o.cancelledAt&&st.k==='cancelled'?' · cancelled '+new Date(o.cancelledAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  var acts='';
+  if(st.k==='declined')acts+='<button type="button" class="btn small quiet" data-act="histreopen" data-id="'+esc(o.id)+'">'+(hist.arm[o.id]?'Tap again to reopen':'Reopen')+'</button>';
+  if(ph)acts+='<a class="btn small quiet" href="tel:'+esc(ph)+'">Call</a>';
+  return '<li class="hrow"><div class="main"><strong>#'+esc(o.queueNumber||'?')+' '+esc(o.name||'No name')+' <span class="pill '+st.c+'">'+esc(st.t)+'</span></strong>'
+    +'<span class="muted small">'+(w?esc(w.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})):'Just now')+' · '+esc(dateTxt)+esc(when)+'</span>'
+    +'<span class="small">'+esc(histItems(o))+' · <b>'+money(histTotal(o))+'</b></span>'
+    +'<span class="muted small">'+esc([o.contact,o.address,o.notes].filter(Boolean).join(' · '))+'</span></div>'
+    +(acts?'<div class="side">'+acts+'</div>':'')+'</li>';
+}
 function renderHist(){
   var card=$('histCard');if(!card)return;
   card.hidden=!web;if(!web)return;
-  var box=$('histBox');
   if(!hist.on){$('histCount').textContent='';return;}
   if(hist.err){$('histList').innerHTML=emptyBox('Order history could not load ('+esc(hist.err)+'). Check your connection and that you are signed in with the shop account.');return;}
-  var counts={};hist.docs.forEach(function(o){var k=histStatus(o).k;counts[k]=(counts[k]||0)+1;});
-  $('histCount').textContent=hist.docs.length+(hist.docs.length>=hist.limit?'+':'')+' orders'+(counts.declined?' · '+counts.declined+' declined':'');
-  $('histFilter').innerHTML=HIST_F.map(function(f){var n=f[0]==='all'?hist.docs.length:(counts[f[0]]||0);return '<button type="button" class="chip" data-act="histf" data-f="'+f[0]+'" aria-pressed="'+(hist.f===f[0])+'">'+f[1]+(n?' '+n:'')+'</button>';}).join('');
+  var inP=hist.docs.filter(histInPeriod);
+  var counts={};inP.forEach(function(o){var k=histStatus(o).k;counts[k]=(counts[k]||0)+1;});
+  $('histCount').textContent=hist.docs.length+(hist.docs.length>=hist.limit?'+':'')+' orders';
+  $('histPeriod').innerHTML=HIST_P.map(function(f){return '<button type="button" class="chip" data-act="histp" data-f="'+f[0]+'" aria-pressed="'+(hist.p===f[0])+'">'+f[1]+'</button>';}).join('');
+  $('histSum').innerHTML=histSummary(inP);
+  $('histFilter').innerHTML=HIST_F.map(function(f){var n=f[0]==='all'?inP.length:(counts[f[0]]||0);return '<button type="button" class="chip" data-act="histf" data-f="'+f[0]+'" aria-pressed="'+(hist.f===f[0])+'">'+f[1]+(n?' '+n:'')+'</button>';}).join('');
   var q=hist.q.trim().toLowerCase().replace(/^#/,'');
-  var shown=hist.docs.filter(function(o){
+  var shown=inP.filter(function(o){
     if(hist.f!=='all'&&histStatus(o).k!==hist.f)return false;
     if(!q)return true;
     return [o.name,o.contact,o.queueNumber,o.id,o.address,o.notes].join(' ').toLowerCase().indexOf(q)>=0;
   });
   $('histMore').hidden=hist.docs.length<hist.limit;
   if(!shown.length){$('histList').innerHTML=emptyBox(hist.docs.length?'No orders match.':'No online orders yet.');return;}
-  $('histList').innerHTML='<ul class="list">'+shown.map(function(o){
-    var st=histStatus(o),w=histWhen(o),del=o.fulfilment==='delivery',ph=webPhone(o.contact);
-    var dateTxt=o.date?(del?'Delivery ':'Pickup ')+dateLabel(o.date):o.preferredBatch?(del?'Wanted delivery ':'Wanted pickup ')+dateLabel(o.preferredBatch):(del?'Delivery':'Pickup');
-    var when=o.declinedAt&&st.k==='declined'?' · declined '+new Date(o.declinedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):o.cancelledAt&&st.k==='cancelled'?' · cancelled '+new Date(o.cancelledAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
-    var acts='';
-    if(st.k==='declined')acts+='<button type="button" class="btn small quiet" data-act="histreopen" data-id="'+esc(o.id)+'">'+(hist.arm[o.id]?'Tap again to reopen':'Reopen')+'</button>';
-    if(ph)acts+='<a class="btn small quiet" href="tel:'+esc(ph)+'">Call</a>';
-    return '<li class="hrow"><div class="main"><strong>#'+esc(o.queueNumber||'?')+' '+esc(o.name||'No name')+' <span class="pill '+st.c+'">'+esc(st.t)+'</span></strong>'
-      +'<span class="muted small">'+(w?esc(w.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})):'Just now')+' · '+esc(dateTxt)+esc(when)+'</span>'
-      +'<span class="small">'+esc(histItems(o))+' · <b>'+money(histTotal(o))+'</b></span>'
-      +'<span class="muted small">'+esc([o.contact,o.address,o.notes].filter(Boolean).join(' · '))+'</span></div>'
-      +(acts?'<div class="side">'+acts+'</div>':'')+'</li>';
-  }).join('')+'</ul>';
+  /* one slide per day the orders came in, newest day first */
+  var days={},keys=[];
+  shown.forEach(function(o){var w=histWhen(o),k=w?ymd(w):ymd(new Date());if(!days[k]){days[k]=[];keys.push(k);}days[k].push(o);});
+  keys.sort(function(x,y){return x<y?1:-1;});
+  $('histList').innerHTML=carHtml('hist',keys.map(function(k){
+    var l=days[k].sort(function(x,y){var a=histWhen(x),b=histWhen(y);return (b?b.getTime():Date.now())-(a?a.getTime():Date.now());});
+    var ok=l.filter(function(o){var s=histStatus(o).k;return s==='confirmed'||s==='done';}),dc=l.filter(function(o){return histStatus(o).k==='declined';}).length;
+    var nice=parseYmd(k).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    return {key:k,label:nice,html:'<div class="resgroup"><div class="gh"><strong>'+esc(dateLabel(k)===nice?nice:dateLabel(k)+' · '+nice)+'</strong><span class="muted small">'+l.length+(l.length===1?' order':' orders')+' · '+money(sum(ok,histTotal))+' confirmed'+(dc?' · '+dc+' declined':'')+'</span></div><ul class="list">'+l.map(histRow).join('')+'</ul></div>'};
+  }),'day');
+  carInit('hist',keys[0]);
 }
 function histCsv(){
   if(!hist.docs.length){toast('No orders to download yet.');return;}
@@ -3369,6 +3402,7 @@ document.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('[data-act^="hist"],[data-act^="topic"]');if(!b)return;
   var a=b.dataset.act;
   if(a==='histf'){hist.f=b.dataset.f;renderHist();}
+  else if(a==='histp'){hist.p=b.dataset.f;delete CAR.hist;renderHist();}
   else if(a==='histmore'){hist.limit+=100;histListen();}
   else if(a==='histcsv')histCsv();
   else if(a==='histreopen')histReopen(b.dataset.id);
