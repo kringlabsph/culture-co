@@ -1055,13 +1055,13 @@ function mixLine(b){
 function packedField(b){
   if(b.failed)return '<span class="pill bad">Failed batch · 0 Greek tubs</span>';
   var plan=tubsPlan(b),got=b.packed;
-  var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':' <span class="pill">Counts once you type it</span>';
+  var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':' <span class="pill">Counting '+r1(plan)+' L until you type it</span>';
   return '<div class="field" style="width:130px"><label for="packed-'+b.id+'">Greek tubs made</label><input id="packed-'+b.id+'" type="number" min="0" step="1" inputmode="numeric" data-act="packed" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+plan+'"></div>'+diff;
 }
 function litersField(b){
   if(b.failed)return '<span class="pill bad">Failed batch · 0 L</span>';
   var plan=litersPlan(b),got=b.liters;
-  var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':' <span class="pill">Counts once you type it</span>';
+  var diff=got!=null?' <span class="pill '+(got>=plan?'good':'warn')+'">'+(got>=plan?'On plan':'Under plan')+'</span>':' <span class="pill">Counting '+r1(plan)+' L until you type it</span>';
   return '<div class="field" style="width:150px"><label for="liters-'+b.id+'">Yogurt made (L)</label><input id="liters-'+b.id+'" type="number" min="0" step="0.1" inputmode="decimal" data-act="liters" data-id="'+b.id+'" value="'+(got==null?'':got)+'" placeholder="'+r1(plan)+'"></div>'+diff;
 }
 /* turn a running Greek batch into a regular one (no straining); keeps the old steps so it can be undone */
