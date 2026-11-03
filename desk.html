@@ -174,6 +174,13 @@ details>summary::-webkit-details-marker{display:none}
 details>summary::after{content:"+";color:var(--muted);font-weight:500}
 details[open]>summary::after{content:"\2212"}
 details>.inner{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+#histBox{border:0;background:none}
+#histBox>summary{padding:0;font-size:18px;align-items:center}
+#histBox>.inner{padding:14px 0 0}
+#histBox[open]>summary{margin-bottom:2px}
+.hrow .main strong{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hrow{align-items:flex-start!important}
+.hrow a.btn{text-decoration:none}
 .card details{background:var(--bg)}
 .srow{display:grid;grid-template-columns:minmax(0,1fr) 84px auto;gap:8px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}
 .srow input[data-step="label"]{grid-column:1/-1}
@@ -378,6 +385,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
   </div>
   <div id="dueBanner" class="banner" hidden></div>
   <div id="resBanner" class="banner" hidden></div>
+  <div id="needBanner" class="banner" hidden></div>
 
   <nav class="nav" aria-label="Sections">
     <button type="button" data-tab="production" id="nav-production"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2.5h6"/></svg><span>Production</span><span class="badge" id="navBadge" hidden>0</span></button>
@@ -563,6 +571,20 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
       <p class="muted small">New orders from your website. Check the date, then approve to add them to your orders and stock. The customer sees the date when they track their order.</p>
       <div id="webNotes" style="display:flex;flex-direction:column;gap:10px"></div>
       <div id="webList" style="display:flex;flex-direction:column;gap:12px"></div>
+      <details id="alertHelp"><summary>Phone alerts when Desk is closed</summary><div class="inner">
+        <p class="small">New orders and "make a batch" alerts also go to the free <b>ntfy</b> app, even when Desk is closed. Install ntfy (Play Store or App Store), tap +, and subscribe to this topic:</p>
+        <div class="actions"><code id="alertTopic" style="font-size:14px;overflow-wrap:anywhere"></code><button type="button" class="btn small quiet" data-act="topiccopy">Copy topic</button><button type="button" class="btn small quiet" data-act="topictest">Send a test</button></div>
+        <p class="muted small">Keep the topic private. Anyone who knows it can see your order alerts.</p>
+      </div></details>
+    </div>
+    <div class="card" id="histCard" hidden>
+      <details id="histBox"><summary><span>Order history <span class="muted small" id="histCount"></span></span></summary><div class="inner">
+        <p class="muted small">Every order from your website, newest first, including the ones you declined.</p>
+        <div class="chips" id="histFilter" role="group" aria-label="Show"></div>
+        <input type="search" id="histQ" placeholder="Search name, phone or order #" autocomplete="off" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)">
+        <div id="histList"></div>
+        <div class="actions"><button type="button" class="btn small quiet" data-act="histmore" id="histMore" hidden>Show older orders</button><button type="button" class="btn small quiet" data-act="histcsv">Download CSV</button></div>
+      </div></details>
     </div>
     <div class="card" id="availCard">
       <div class="cardhead"><h2>Available on the website</h2><span class="pill" id="availCount"></span></div>
@@ -2935,7 +2957,9 @@ window.addEventListener('offline',function(){toast('Offline. Changes are saved a
 
 /* ---------- website link (online orders + shop menu and stock) ---------- */
 var web=null,webOrders=[],webFirst=true,webPub='',webPubTimer=null,webDecline={},webSel={};
-var WEB_STATUS_NOTE='Online',webNotes=[];
+var WEB_STATUS_NOTE='Online',webNotes=[],histReopened={};
+/* same ntfy topic as orderAlertTopic in index.html: alerts reach the ntfy app even when Desk is closed */
+var ALERT_TOPIC='cultureco-yl4c1ni80jlc';
 function webSiteUrl(){return location.origin+location.pathname.replace(/[^/]*$/,'');}
 function longDate(d){return parseYmd(d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}
 function webMsg(n){
@@ -3009,7 +3033,7 @@ function webBeep(){
 function webListen(){
   web.fs.collection('orders').where('status','==','pending').onSnapshot(function(snap){
     var fresh=[];
-    if(!webFirst)snap.docChanges().forEach(function(c){if(c.type==='added')fresh.push(c.doc.id);});
+    if(!webFirst)snap.docChanges().forEach(function(c){if(c.type==='added'&&!histReopened[c.doc.id])fresh.push(c.doc.id);});
     webOrders=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).sort(function(a,b){return (a.queueNumber||0)-(b.queueNumber||0);});
     webFirst=false;
     renderAll();
@@ -3093,7 +3117,7 @@ function approveWeb(id){
 function declineWeb(id){
   if(!webDecline[id]){webDecline[id]=1;renderWeb();setTimeout(function(){delete webDecline[id];renderWeb();},4000);return;}
   delete webDecline[id];
-  var od=webOrders.find(function(x){return x.id===id;});web.fs.collection('orders').doc(id).update({status:'cancelled'}).then(function(){if(od){addCustNote({o:Object.assign({id:id},od),kind:'declined'});}toast('Order declined. Let them know.');}).catch(function(){toast('Could not decline. Try again.');});
+  var od=webOrders.find(function(x){return x.id===id;});web.fs.collection('orders').doc(id).update({status:'cancelled',declinedAt:Date.now()}).then(function(){if(od){addCustNote({o:Object.assign({id:id},od),kind:'declined'});}toast('Order declined. Let them know.');}).catch(function(){toast('Could not decline. Try again.');});
 }
 function webSync(key,fields){
   if(!web)return;
@@ -3122,8 +3146,194 @@ document.addEventListener('change',function(e){
   var _st=setResStatus;setResStatus=function(key,st){if(st==='cancelled')webSync(key,{status:'cancelled'});else if(st==='reserved')webSync(key,{status:'approved'});return _st.apply(this,arguments);};
   var _sb=setResBatch;setResBatch=function(key,v){webSync(key,{batchId:v||null,batchLabel:v?(batchName(v)||'Batch'):null});return _sb.apply(this,arguments);};
 })();
+/* ---------- make a batch: pre-orders need more than you have or have running ---------- */
+function ntfySend(title,body,tags,click){
+  if(!ALERT_TOPIC)return Promise.resolve();
+  return fetch('https://ntfy.sh/'+encodeURIComponent(ALERT_TOPIC),{method:'POST',headers:{'Title':title,'Tags':tags||'bell','Click':click||(webSiteUrl()+'desk.html')},body:body}).catch(function(){});
+}
+/* tubs or liters from batches that are running but not packed yet, on the day they should be ready */
+function runPlanned(G){
+  var m={},from=addDays(ymd(new Date()),-3);
+  mem.batches.forEach(function(b){
+    if(b.failed)return;
+    if(G?(isRegular(b)||b.packed!=null):(!isRegular(b)||b.liters!=null))return;
+    var d=invDay(b);if(d<from)return;
+    m[d]=(m[d]||0)+(G?tubsPlan(b):litersPlan(b));
+  });
+  return m;
+}
+function packDayIf(ts,G){
+  var b={startAt:ts,steps:(G?S.steps:regularSteps()).map(function(s){return {label:s.label,mins:s.mins,mode:s.mode};}),at:{},done:[],size:1,packed:null};
+  if(!G)b.type='regular';
+  try{return invDay(b);}catch(e){return null;}
+}
+/* the latest day you can start a batch and still have it ready by the deadline */
+function startBy(G,deadline){
+  var p=clockParts(),now=new Date(),best=null;
+  for(var i=0;i<=8;i++){
+    var d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i,p[0],p[1]),day=ymd(d);
+    if(day>deadline)break;
+    var ts=i===0&&d<now?now.getTime():d.getTime(),pd=packDayIf(ts,G);
+    if(pd&&pd<=deadline)best={day:day,at:ts};
+  }
+  return best;
+}
+function needOf(G){
+  if(G){
+    if(!greekProd())return null;
+    var gOn=S.prodDays.length||Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
+    if(!gOn)return null;
+  }else{
+    if(!S.products.some(function(p){return isPool(p.name);})||!yogActive())return null;
+  }
+  var today=ymd(new Date()),map=G?invMap():yogMap(),run=runPlanned(G),cum=0,worst=0,first=null,orders=0;
+  Object.keys(run).forEach(function(k){if(k<today)cum+=run[k];});
+  for(var i=0;i<=7;i++){
+    var d=addDays(today,i),row=map.rows[d];
+    cum+=run[d]||0;
+    if(G)cum-=invExpected(d); /* planned-but-not-started batches don't count: you still have to make them */
+    var e=(row?row.end:(G?invEnd(d):yogEnd(d)))+cum;
+    if(row&&row.out)orders+=row.out;
+    if(e<-1e-6){if(!first)first=d;if(-e>worst)worst=-e;}
+  }
+  if(!first)return null;
+  var per=G?(Number(S.recipe.greekPerBatch)||4):(Number(S.recipe.mixL)||4);
+  return {G:G,first:first,short:G?Math.ceil(worst-1e-6):r1(worst),batches:Math.max(1,Math.ceil(worst/per-1e-6)),by:startBy(G,first)};
+}
+function batchNeeds(){return [needOf(true),needOf(false)].filter(Boolean);}
+function needText(n){
+  var what=n.G?n.short+' more Greek '+(n.short===1?'tub':'tubs'):fmtL(n.short)+' more yogurt for cups and drinks';
+  var make=n.batches+(n.G?' Greek':' regular')+(n.batches===1?' batch':' batches');
+  var by=n.by?(n.by.day===ymd(new Date())?(n.by.at<=Date.now()+60000?'start now':'start today at '+new Date(n.by.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})):'start by '+dateLabel(n.by.day)):'start now, it may not be ready in time';
+  return {title:'Make '+make,body:'Pre-orders need '+what+' by '+dateLabel(n.first)+'. Make '+make+', '+by+'.',make:make,what:what,by:by};
+}
+function renderNeedBanner(){
+  var el=$('needBanner');if(!el)return;
+  var ns=batchNeeds();
+  if(!ns.length){el.hidden=true;el.innerHTML='';return;}
+  el.hidden=false;
+  el.innerHTML='<div class="list">'+ns.map(function(n){var t=needText(n);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">for pre-orders: '+esc(t.what)+' needed by '+esc(dateLabel(n.first))+', '+esc(t.by)+'.</span></span>';}).join('')+'</div>'
+    +'<div class="actions">'+ns.map(function(n,i){return '<button type="button" class="btn small'+(i?' quiet':'')+'" data-act="needstart" data-k="'+(n.G?'g':'y')+'">Start '+(n.G?'Greek':'regular')+' batch</button>';}).join('')+'<button type="button" class="btn small quiet" data-tab="production" data-to="stockCard">See stock</button></div>';
+}
+var NEED_LS='cc-desk-need';
+var needReady=false;
+function needCheck(){
+  if(!needReady)return; /* wait until orders and batches have loaded so we don't alert on half the data */
+  var ns=batchNeeds();if(!ns.length)return;
+  var seen={};try{seen=JSON.parse(localStorage.getItem(NEED_LS)||'{}')||{};}catch(e){}
+  var now=Date.now(),changed=false;
+  ns.forEach(function(n){
+    var k=(n.G?'g':'y')+':'+n.first+':'+n.batches,t=needText(n);
+    if(!seen[k]){seen[k]=now;changed=true;deskNotify(t.title,t.body,'need-'+(n.G?'g':'y'));}
+    /* ntfy: one alert per need across all your devices, remembered in Firestore */
+    if(web&&db&&ALERT_TOPIC&&!needCheck.busy){
+      needCheck.busy=true;
+      var ref=db.doc('settings/alerts');
+      ref.get().then(function(s){
+        var sent=(s.exists&&s.data().sent)||{};
+        if(sent[k])return;
+        sent[k]=now;Object.keys(sent).forEach(function(x){if(now-sent[x]>14*86400000)delete sent[x];});
+        return ref.set({sent:sent}).then(function(){return ntfySend(t.title,t.body,'warning',webSiteUrl()+'desk.html#production');});
+      }).catch(function(){}).then(function(){needCheck.busy=false;});
+    }
+  });
+  if(changed){Object.keys(seen).forEach(function(x){if(now-seen[x]>14*86400000)delete seen[x];});try{localStorage.setItem(NEED_LS,JSON.stringify(seen));}catch(e){}}
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-act="needstart"]');if(!b)return;
+  var bt=$('bType');if(bt){bt.value=b.dataset.k==='y'?'regular':'greek';bt.dispatchEvent(new Event('change',{bubbles:true}));}
+  show('production');var bf=$('batchForm');setTimeout(function(){if(bf){bf.scrollIntoView({behavior:'smooth',block:'center'});}},30);
+});
+
+/* ---------- order history: every online order, including declined ---------- */
+var hist={on:false,limit:100,docs:[],f:'all',q:'',unsub:null,arm:{},err:''};
+var HIST_F=[['all','All'],['waiting','Waiting'],['confirmed','Confirmed'],['done','Done'],['declined','Declined'],['cancelled','Cancelled']];
+function histStatus(o){
+  var s=o.status==='assigned'?'approved':o.status;
+  if(s==='cancelled')return o.wasApproved?{k:'cancelled',t:'Cancelled',c:'bad'}:{k:'declined',t:'Declined',c:'bad'};
+  if(s==='pending')return {k:'waiting',t:'Waiting',c:'warn'};
+  if(s==='approved')return {k:'confirmed',t:o.rescheduledAt?'Confirmed, moved':'Confirmed',c:'acc'};
+  if(s==='ready')return {k:'done',t:'Ready',c:'good'};
+  if(s==='completed')return {k:'done',t:'Completed',c:'good'};
+  return {k:'other',t:s||'Unknown',c:''};
+}
+function histWhen(o){var d=o.createdAt&&o.createdAt.toDate?o.createdAt.toDate():null;return d;}
+function histTotal(o){return typeof o.total==='number'?o.total:webTotal(o);}
+function histItems(o){return (o.items||[]).map(function(it){var l={qty:num(it.qty),pack:it.pack>1?it.pack:undefined,flavors:it.flavors||undefined,product:it.product};return qtyText(l)+' × '+shortName(it.product)+flavInline(l);}).join(', ');}
+function histListen(){
+  if(!web)return;
+  if(hist.unsub)hist.unsub();
+  hist.on=true;
+  hist.unsub=web.fs.collection('orders').orderBy('createdAt','desc').limit(hist.limit).onSnapshot(function(snap){
+    hist.err='';hist.docs=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});renderHist();
+  },function(e){hist.err=e.code||'error';renderHist();});
+}
+function renderHist(){
+  var card=$('histCard');if(!card)return;
+  card.hidden=!web;if(!web)return;
+  var box=$('histBox');
+  if(!hist.on){$('histCount').textContent='';return;}
+  if(hist.err){$('histList').innerHTML=emptyBox('Order history could not load ('+esc(hist.err)+'). Check your connection and that you are signed in with the shop account.');return;}
+  var counts={};hist.docs.forEach(function(o){var k=histStatus(o).k;counts[k]=(counts[k]||0)+1;});
+  $('histCount').textContent=hist.docs.length+(hist.docs.length>=hist.limit?'+':'')+' orders'+(counts.declined?' · '+counts.declined+' declined':'');
+  $('histFilter').innerHTML=HIST_F.map(function(f){var n=f[0]==='all'?hist.docs.length:(counts[f[0]]||0);return '<button type="button" class="chip" data-act="histf" data-f="'+f[0]+'" aria-pressed="'+(hist.f===f[0])+'">'+f[1]+(n?' '+n:'')+'</button>';}).join('');
+  var q=hist.q.trim().toLowerCase().replace(/^#/,'');
+  var shown=hist.docs.filter(function(o){
+    if(hist.f!=='all'&&histStatus(o).k!==hist.f)return false;
+    if(!q)return true;
+    return [o.name,o.contact,o.queueNumber,o.id,o.address,o.notes].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  $('histMore').hidden=hist.docs.length<hist.limit;
+  if(!shown.length){$('histList').innerHTML=emptyBox(hist.docs.length?'No orders match.':'No online orders yet.');return;}
+  $('histList').innerHTML='<ul class="list">'+shown.map(function(o){
+    var st=histStatus(o),w=histWhen(o),del=o.fulfilment==='delivery',ph=webPhone(o.contact);
+    var dateTxt=o.date?(del?'Delivery ':'Pickup ')+dateLabel(o.date):o.preferredBatch?(del?'Wanted delivery ':'Wanted pickup ')+dateLabel(o.preferredBatch):(del?'Delivery':'Pickup');
+    var when=o.declinedAt&&st.k==='declined'?' · declined '+new Date(o.declinedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):o.cancelledAt&&st.k==='cancelled'?' · cancelled '+new Date(o.cancelledAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+    var acts='';
+    if(st.k==='declined')acts+='<button type="button" class="btn small quiet" data-act="histreopen" data-id="'+esc(o.id)+'">'+(hist.arm[o.id]?'Tap again to reopen':'Reopen')+'</button>';
+    if(ph)acts+='<a class="btn small quiet" href="tel:'+esc(ph)+'">Call</a>';
+    return '<li class="hrow"><div class="main"><strong>#'+esc(o.queueNumber||'?')+' '+esc(o.name||'No name')+' <span class="pill '+st.c+'">'+esc(st.t)+'</span></strong>'
+      +'<span class="muted small">'+(w?esc(w.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})):'Just now')+' · '+esc(dateTxt)+esc(when)+'</span>'
+      +'<span class="small">'+esc(histItems(o))+' · <b>'+money(histTotal(o))+'</b></span>'
+      +'<span class="muted small">'+esc([o.contact,o.address,o.notes].filter(Boolean).join(' · '))+'</span></div>'
+      +(acts?'<div class="side">'+acts+'</div>':'')+'</li>';
+  }).join('')+'</ul>';
+}
+function histCsv(){
+  if(!hist.docs.length){toast('No orders to download yet.');return;}
+  var rows=[['Order no.','Code','Ordered at','Customer','Contact','Pickup or delivery','Date','Status','Items','Total','Address','Notes']];
+  hist.docs.forEach(function(o){var w=histWhen(o);rows.push([o.queueNumber||'',o.id,w?w.toISOString():'',o.name||'',o.contact||'',o.fulfilment==='delivery'?'Delivery':'Pickup',o.date||o.preferredBatch||'',histStatus(o).t,histItems(o),histTotal(o),o.address||'',o.notes||'']);});
+  saveFile('culture-co-order-history-'+ymd(new Date())+'.csv',csv(rows));
+}
+function histReopen(id){
+  if(!hist.arm[id]){hist.arm[id]=1;renderHist();setTimeout(function(){delete hist.arm[id];renderHist();},4000);return;}
+  delete hist.arm[id];histReopened[id]=1;
+  web.fs.collection('orders').doc(id).update({status:'pending',declinedAt:null,reopenedAt:Date.now()})
+    .then(function(){toast('Order is back in Online orders, waiting for you.');})
+    .catch(function(){delete histReopened[id];toast('Could not reopen. Try again.');});
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-act^="hist"],[data-act^="topic"]');if(!b)return;
+  var a=b.dataset.act;
+  if(a==='histf'){hist.f=b.dataset.f;renderHist();}
+  else if(a==='histmore'){hist.limit+=100;histListen();}
+  else if(a==='histcsv')histCsv();
+  else if(a==='histreopen')histReopen(b.dataset.id);
+  else if(a==='topiccopy')copyText(ALERT_TOPIC,'Topic copied. Paste it in the ntfy app.');
+  else if(a==='topictest'){ntfySend('Test alert from Desk','If you see this on your phone, order alerts are working.','white_check_mark').then(function(){toast('Test sent. Check the ntfy app.');});}
+});
+$('histQ').addEventListener('input',function(){hist.q=this.value;renderHist();});
+$('histBox').addEventListener('toggle',function(){if(this.open&&!hist.on)histListen();});
+(function(){
+  var _rb=renderBanners;renderBanners=function(){_rb.apply(this,arguments);renderNeedBanner();};
+  var _rc=remindCheck;remindCheck=function(){_rc.apply(this,arguments);needCheck();};
+  var _ra=renderAll;renderAll=function(){_ra.apply(this,arguments);renderNeedBanner();renderHist();};
+})();
+
 window.deskConnect=function(adapter,fs){
   web={fs:fs};
+  var at=$('alertTopic');if(at)at.textContent=ALERT_TOPIC;
+  setTimeout(function(){needReady=true;needCheck();},15000);
   loadCustNotes();renderWebNotes();renderAlertsBtn();renderInstallBtn();
   connectDb(adapter);
   webListen();

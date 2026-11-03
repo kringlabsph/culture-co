@@ -858,7 +858,7 @@ $("cfGo").onclick = async () => {
       preferredBatch: selBatch || null });
     if (SITE.orderAlertTopic) fetch("https://ntfy.sh/" + encodeURIComponent(SITE.orderAlertTopic), { method: "POST",
       headers: { "Title": `New pre-order #${r.queueNumber}`, "Tags": "bell", "Click": location.origin + location.pathname.replace(/[^/]*$/, "") + "desk.html#reserve" },
-      body: `${d.name.split(" ")[0]} · ${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)} · ${fulfilment === "delivery" ? "Delivery" : "Pickup"}` }).catch(() => {});
+      body: `${d.name.split(" ")[0]} · ${c.pieces} item${c.pieces === 1 ? "" : "s"} · ${peso(c.total)} · ${fulfilment === "delivery" ? "Delivery" : "Pickup"}${selBatch ? " for " + new Date(selBatch + "T00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : ""}` }).catch(() => {});
     $("dQueue").textContent = "#" + r.queueNumber; $("dCode").textContent = r.id; $("code").value = r.id;
     try { localStorage.setItem("cc_last", r.id); } catch {}
     watch(r.id, true);
