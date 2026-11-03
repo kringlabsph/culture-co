@@ -3163,9 +3163,11 @@ document.addEventListener('change',function(e){
   var _sb=setResBatch;setResBatch=function(key,v){webSync(key,{batchId:v||null,batchLabel:v?(batchName(v)||'Batch'):null});return _sb.apply(this,arguments);};
 })();
 /* ---------- make a batch: pre-orders need more than you have or have running ---------- */
-function ntfySend(title,body,tags,click){
+function ntfySend(title,body,tags,click,at){
   if(!ALERT_TOPIC)return Promise.resolve();
-  return fetch('https://ntfy.sh/'+encodeURIComponent(ALERT_TOPIC),{method:'POST',headers:{'Title':title,'Tags':tags||'bell','Click':click||(webSiteUrl()+'desk.html')},body:body}).catch(function(){});
+  var h={'Title':title,'Tags':tags||'bell','Click':click||(webSiteUrl()+'desk.html')};
+  if(at&&at*1000>Date.now()+60000)h['At']=String(at); /* deliver later (unix seconds) */
+  return fetch('https://ntfy.sh/'+encodeURIComponent(ALERT_TOPIC),{method:'POST',headers:h,body:body}).catch(function(){});
 }
 /* tubs or liters from batches that are running but not packed yet, on the day they should be ready */
 function runPlanned(G){
@@ -3216,44 +3218,79 @@ function needOf(G){
   var per=G?(Number(S.recipe.greekPerBatch)||4):(Number(S.recipe.mixL)||4);
   return {G:G,first:first,short:G?Math.ceil(worst-1e-6):r1(worst),batches:Math.max(1,Math.ceil(worst/per-1e-6)),by:startBy(G,first)};
 }
-function batchNeeds(){return [needOf(true),needOf(false)].filter(Boolean);}
+/* Greek: alert when pre-orders need more tubs than you have. Regular yogurt has its own reminder below. */
+function batchNeeds(){return [needOf(true)].filter(Boolean);}
 function needText(n){
-  var what=n.G?n.short+' more Greek '+(n.short===1?'tub':'tubs'):fmtL(n.short)+' more yogurt for cups and drinks';
-  var make=n.batches+(n.G?' Greek':' regular')+(n.batches===1?' batch':' batches');
+  var what=n.short+' more Greek '+(n.short===1?'tub':'tubs');
+  var make=n.batches+' Greek'+(n.batches===1?' batch':' batches');
   var by=n.by?(n.by.day===ymd(new Date())?(n.by.at<=Date.now()+60000?'start now':'start today at '+new Date(n.by.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})):'start by '+dateLabel(n.by.day)):'start now, it may not be ready in time';
   return {title:'Make '+make,body:'Pre-orders need '+what+' by '+dateLabel(n.first)+'. Make '+make+', '+by+'.',make:make,what:what,by:by};
 }
+/* ---------- regular yogurt: when a delivery day has pre-orders for cups or drinks, remind 2 days before ---------- */
+var REG_DAYS_BEFORE=2,REG_HOUR=7; /* 7:00 AM, two days before the delivery day */
+function regAt(D){var d=parseYmd(D);return new Date(d.getFullYear(),d.getMonth(),d.getDate()-REG_DAYS_BEFORE,REG_HOUR,0).getTime();}
+/* a regular batch started from 3 days before up to the delivery day counts as made for it */
+function regDone(D){var from=addDays(D,-3);return mem.batches.some(function(b){if(!isRegular(b)||b.failed)return false;var k=ymd(new Date(b.startAt));return k>=from&&k<=D;});}
+function regReminders(){
+  if(!S.products.some(function(p){return isPool(p.name);}))return [];
+  var today=ymd(new Date()),out=[];
+  batchDates().forEach(function(D){
+    if(D<=today||D>addDays(today,10))return;
+    var lines=yogLines(D).filter(function(x){return isPool(x.product);});if(!lines.length)return;
+    var L=yogOut(D);if(!(L>0)||regDone(D))return;
+    var pcs={};lines.forEach(function(x){var k=shortName(x.product);pcs[k]=(pcs[k]||0)+piecesOf(x);});
+    var at=regAt(D),per=Number(S.recipe.mixL)||4;
+    out.push({D:D,at:at,due:at<=Date.now(),L:r1(L),batches:Math.max(1,Math.ceil(L/per-1e-6)),items:Object.keys(pcs).map(function(k){return pcs[k]+' × '+k;}).join(', ')});
+  });
+  return out;
+}
+function regText(r){
+  var make=r.batches+' regular '+(r.batches===1?'batch':'batches'),day=DOW[parseYmd(r.D).getDay()];
+  return {title:'Make '+make+' for '+day+' delivery',body:'Pre-orders for '+longDate(r.D)+' need about '+fmtL(r.L)+' of yogurt ('+r.items+'). Make '+make+' today. Already started it? Ignore this.',short:'pre-orders need about '+fmtL(r.L)+' of yogurt ('+r.items+')'};
+}
 function renderNeedBanner(){
   var el=$('needBanner');if(!el)return;
-  var ns=batchNeeds();
-  if(!ns.length){el.hidden=true;el.innerHTML='';return;}
+  var ns=batchNeeds(),rs=regReminders().filter(function(r){return r.due;});
+  if(!ns.length&&!rs.length){el.hidden=true;el.innerHTML='';return;}
   el.hidden=false;
-  el.innerHTML='<div class="list">'+ns.map(function(n){var t=needText(n);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">for pre-orders: '+esc(t.what)+' needed by '+esc(dateLabel(n.first))+', '+esc(t.by)+'.</span></span>';}).join('')+'</div>'
-    +'<div class="actions">'+ns.map(function(n,i){return '<button type="button" class="btn small'+(i?' quiet':'')+'" data-act="needstart" data-k="'+(n.G?'g':'y')+'">Start '+(n.G?'Greek':'regular')+' batch</button>';}).join('')+'<button type="button" class="btn small quiet" data-tab="production" data-to="stockCard">See stock</button></div>';
+  el.innerHTML='<div class="list">'+ns.map(function(n){var t=needText(n);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">for pre-orders: '+esc(t.what)+' needed by '+esc(dateLabel(n.first))+', '+esc(t.by)+'.</span></span>';}).join('')
+    +rs.map(function(r){var t=regText(r);return '<span><strong>'+esc(t.title)+'</strong> <span class="muted">'+esc(t.short)+'.</span></span>';}).join('')+'</div>'
+    +'<div class="actions">'+(ns.length?'<button type="button" class="btn small" data-act="needstart" data-k="g">Start Greek batch</button>':'')+(rs.length?'<button type="button" class="btn small'+(ns.length?' quiet':'')+'" data-act="needstart" data-k="y">Start regular batch</button>':'')+'<button type="button" class="btn small quiet" data-tab="production" data-to="stockCard">See stock</button></div>';
 }
 var NEED_LS='cc-desk-need';
 var needReady=false;
 function needCheck(){
   if(!needReady)return; /* wait until orders and batches have loaded so we don't alert on half the data */
-  var ns=batchNeeds();if(!ns.length)return;
   var seen={};try{seen=JSON.parse(localStorage.getItem(NEED_LS)||'{}')||{};}catch(e){}
-  var now=Date.now(),changed=false;
-  ns.forEach(function(n){
-    var k=(n.G?'g':'y')+':'+n.first+':'+n.batches,t=needText(n);
-    if(!seen[k]){seen[k]=now;changed=true;deskNotify(t.title,t.body,'need-'+(n.G?'g':'y'));}
-    /* ntfy: one alert per need across all your devices, remembered in Firestore */
-    if(web&&db&&ALERT_TOPIC&&!needCheck.busy){
-      needCheck.busy=true;
-      var ref=db.doc('settings/alerts');
-      ref.get().then(function(s){
-        var sent=(s.exists&&s.data().sent)||{};
-        if(sent[k])return;
-        sent[k]=now;Object.keys(sent).forEach(function(x){if(now-sent[x]>14*86400000)delete sent[x];});
-        return ref.set({sent:sent}).then(function(){return ntfySend(t.title,t.body,'warning',webSiteUrl()+'desk.html#production');});
-      }).catch(function(){}).then(function(){needCheck.busy=false;});
+  var now=Date.now(),changed=false,jobs=[],click=webSiteUrl()+'desk.html#production';
+  batchNeeds().forEach(function(n){
+    var k='g:'+n.first+':'+n.batches,t=needText(n);
+    if(!seen[k]){seen[k]=now;changed=true;deskNotify(t.title,t.body,'need-g');}
+    jobs.push({k:k,t:t});
+  });
+  regReminders().forEach(function(r){
+    var t=regText(r);
+    if(r.due){
+      if(!seen['reg:'+r.D]){seen['reg:'+r.D]=now;changed=true;deskNotify(t.title,t.body,'reg-'+r.D);}
+      jobs.push({k:'reg:'+r.D,also:'regs:'+r.D,t:t});
+    }else if(r.at-now<70*3600000){
+      /* ntfy can hold a message for up to 3 days, so the reminder reaches your phone at 7 AM even if Desk is closed */
+      jobs.push({k:'regs:'+r.D,t:t,at:Math.round(r.at/1000)});
     }
   });
   if(changed){Object.keys(seen).forEach(function(x){if(now-seen[x]>14*86400000)delete seen[x];});try{localStorage.setItem(NEED_LS,JSON.stringify(seen));}catch(e){}}
+  /* ntfy: each alert goes out once across all your devices, remembered in Firestore */
+  if(!jobs.length||!web||!db||!ALERT_TOPIC||needCheck.busy)return;
+  needCheck.busy=true;
+  var ref=db.doc('settings/alerts');
+  ref.get().then(function(s){
+    var sent=(s.exists&&s.data().sent)||{};
+    var go=jobs.filter(function(j){return !sent[j.k]&&!(j.also&&sent[j.also]);});
+    if(!go.length)return;
+    go.forEach(function(j){sent[j.k]=now;});
+    Object.keys(sent).forEach(function(x){if(now-sent[x]>14*86400000)delete sent[x];});
+    return ref.set({sent:sent}).then(function(){return Promise.all(go.map(function(j){return ntfySend(j.t.title,j.t.body,'warning',click,j.at);}));});
+  }).catch(function(){}).then(function(){needCheck.busy=false;});
 }
 document.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('[data-act="needstart"]');if(!b)return;
