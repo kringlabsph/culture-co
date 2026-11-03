@@ -588,6 +588,18 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
         <div class="actions"><button type="button" class="btn small quiet" data-act="histmore" id="histMore" hidden>Show older orders</button><button type="button" class="btn small quiet" data-act="histcsv">Download CSV</button></div>
       </div></details>
     </div>
+    <div class="card" id="annCard">
+      <div class="cardhead"><h2>Announcement on the website</h2><span class="pill" id="annPill"></span></div>
+      <p class="muted small">Shows at the top of your website, for example when you take time off. Set the break dates to pause pre-orders for those days.</p>
+      <div class="form">
+        <div class="field"><label for="annFrom">Break from</label><input type="date" id="annFrom"></div>
+        <div class="field"><label for="annTo">Break until</label><input type="date" id="annTo"></div>
+        <div class="field"><label>Pre-orders</label><label style="display:flex;gap:8px;align-items:center;min-height:42px;font-size:15px;color:var(--ink);font-weight:500;letter-spacing:0"><input id="annPause" type="checkbox" checked> Pause delivery days in the break</label></div>
+      </div>
+      <div class="field"><label for="annText">Message</label><textarea id="annText" rows="5" style="width:100%;font:inherit;font-size:15px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg);color:var(--ink);resize:vertical" placeholder="We're taking a short break..."></textarea></div>
+      <div class="actions"><button type="button" class="btn small" data-act="annsave">Save and show</button><button type="button" class="btn small quiet" data-act="annfill">Write it for me</button><button type="button" class="btn small quiet" data-act="annoff" id="annOff">Remove</button></div>
+      <p class="muted small" id="annStatus"></p>
+    </div>
     <div class="card" id="availCard">
       <div class="cardhead"><h2>Available on the website</h2><span class="pill" id="availCount"></span></div>
       <p class="muted small">Switch a product off when you can't make it. Customers see it marked unavailable on the website and can't order it until you switch it back on.</p>
@@ -3024,7 +3036,7 @@ function todayOffer(){
   return any?{date:k,label:'Today',left:left,sameDay:true,yogL:yl}:null;
 }
 function shopSnapshot(){
-  var batches=batchDates().slice(0,6).map(function(k){
+  var batches=batchDates().filter(function(k){return !annPaused(k);}).slice(0,6).map(function(k){
     var left={};
     stockRows(k).forEach(function(x){left[x.p.name]=Math.max(0,Math.floor(x.left));});
     var o={date:k,label:batchName(k)||'Batch',left:left},man=S.capacity.stock[k];
@@ -3033,7 +3045,8 @@ function shopSnapshot(){
   });
   return {deliveryFee:num(S.deliveryFee),flavors:S.flavors.slice(),
     products:S.products.map(function(p){return {name:p.name,price:num(p.price),packQty:Math.max(1,Number(p.packQty)||1),flavored:!!p.flavored,flavors:p.flavored?offered(p):[],greek:GREEK.test(p.name),kg:Number(p.kg)||0,color:p.color==null?null:p.color,off:!!p.off};}),
-    batches:(function(){var t=todayOffer();return t?[t].concat(batches):batches;})()};
+    batches:(function(){var t=todayOffer();return (t?[t].concat(batches):batches).filter(function(b){return !annPaused(b.date);});})(),
+    announce:annLive()};
 }
 function webPublish(){
   if(!web)return;
@@ -3167,6 +3180,48 @@ document.addEventListener('change',function(e){
   var _st=setResStatus;setResStatus=function(key,st){if(st==='cancelled')webSync(key,{status:'cancelled'});else if(st==='reserved')webSync(key,{status:'approved'});return _st.apply(this,arguments);};
   var _sb=setResBatch;setResBatch=function(key,v){webSync(key,{batchId:v||null,batchLabel:v?(batchName(v)||'Batch'):null});return _sb.apply(this,arguments);};
 })();
+/* ---------- website announcement (time off) ---------- */
+function annGet(){return S.announce&&typeof S.announce==='object'?S.announce:null;}
+/* live = has a message and the break (if any) hasn't ended yet */
+function annLive(){var a=annGet();if(!a||!(a.text||'').trim())return null;var t=ymd(new Date());if(a.to&&a.to<t)return null;return {text:String(a.text).trim(),from:a.from||null,to:a.to||null,pause:!!a.pause};}
+function annPaused(d){var a=annGet();if(!a||!a.pause||!a.from||!a.to)return false;return d>=a.from&&d<=a.to;}
+function annNextDay(to){for(var i=1;i<=35;i++){var k=addDays(to,i);if(capFor(k)>0)return k;}return null;}
+function annLong(d){return parseYmd(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
+function annDraft(){
+  var f=$('annFrom').value,t=$('annTo').value;
+  if(!f||!t)return 'Culture Co. is taking a short break. Thank you for waiting! Message us on Messenger if you have questions.';
+  var nx=annNextDay(t);
+  return 'Culture Co. is taking a short break from '+annLong(f)+' to '+annLong(t)+'. There are no deliveries or pickups on those days.'+(nx?' You can already pre-order for '+annLong(nx)+' onward.':'')+' Thank you!';
+}
+function renderAnn(){
+  var card=$('annCard');if(!card)return;
+  if(card.contains(document.activeElement)&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;
+  var a=annGet()||{},live=annLive(),t=ymd(new Date());
+  $('annFrom').value=a.from||'';$('annTo').value=a.to||'';$('annPause').checked=a.pause!==false;$('annText').value=a.text||'';
+  $('annOff').hidden=!a.text&&!a.from;
+  var pill=$('annPill');
+  if(live){pill.textContent='Showing';pill.className='pill good';}
+  else if(a.text&&a.to&&a.to<t){pill.textContent='Ended';pill.className='pill';}
+  else{pill.textContent='Off';pill.className='pill';}
+  var paused=live&&live.pause&&live.from&&live.to?batchDates().filter(annPaused):[];
+  $('annStatus').textContent=live?('On the website now'+(live.to?', until the end of '+annLong(live.to):'')+'.'+(paused.length?' Paused delivery days: '+paused.map(annLong).join(', ')+'.':'')+(live.pause&&live.from&&live.to?' Pre-orders you already approved for those days stay in Desk, so move or cancel them.':'')):'Nothing is showing on the website.';
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-act^="ann"]');if(!b)return;
+  var a=b.dataset.act;
+  if(a==='annfill'){$('annText').value=annDraft();$('annText').focus();return;}
+  if(a==='annoff'){S.announce=null;saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Announcement removed. Pre-orders are open again.');return;}
+  if(a==='annsave'){
+    var f=$('annFrom').value,t=$('annTo').value,txt=$('annText').value.trim();
+    if((f&&!t)||(!f&&t)){toast('Pick both break dates, or leave both blank.');return;}
+    if(f&&t&&t<f){toast('The break ends before it starts. Check the dates.');return;}
+    if(!txt)txt=annDraft();
+    S.announce={text:txt,from:f||null,to:t||null,pause:$('annPause').checked};
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Announcement saved. It shows on the website in a few seconds.');
+  }
+});
+(function(){var _ra=renderAll;renderAll=function(){_ra.apply(this,arguments);renderAnn();};})();
+
 /* ---------- make a batch: pre-orders need more than you have or have running ---------- */
 function ntfySend(title,body,tags,click,at){
   if(!ALERT_TOPIC)return Promise.resolve();
