@@ -133,6 +133,7 @@ section{padding:110px 0}
 @keyframes pop{to{transform:scale(1)}}
 .day .left{font-size:13px;color:var(--ink-2);margin-top:8px;display:flex;flex-wrap:wrap;gap:2px 12px}
 .day .left b{color:var(--forest);font-weight:800}
+.day .left .orl i{font-style:normal;font-weight:700;color:var(--ink-2);text-transform:uppercase;font-size:11px;letter-spacing:.06em;margin:0 2px}
 .soldout,.leftn{display:inline-block;margin-top:8px;font-size:13px;font-weight:800;border-radius:999px;padding:4px 12px}
 .leftn{background:var(--paper);color:var(--forest)}
 .soldout{background:var(--blush);color:#8f2f48}
@@ -684,12 +685,20 @@ function renderBatches(){
     const rows = shop.products.filter(p => !p.off && b.left && typeof b.left[p.name] === "number");
     const total = rows.reduce((a,p) => a + b.left[p.name], 0);
     const full = rows.length && total <= 0;
+    /* tubs, drinks and minis come out of the same yogurt: show them as one "or" line, not as separate stock */
+    const shared = typeof b.yogL === "number", solo = rows.filter(p => !(shared && poolOf(p)));
+    const pool = shared ? rows.filter(poolOf) : [], big = pool.filter(p => p.kg >= 0.3), small = pool.filter(p => p.kg < 0.3);
+    const maxOf = l => l.length ? Math.max(...l.map(p => b.left[p.name])) : 0;
+    const orLine = pool.length && maxOf(pool) > 0 ? `<span class="orl">${[big.length ? `<b>${maxOf(big)}</b> tubs` : "", small.length ? `<b>${maxOf(small)}</b> drinks or minis` : ""].filter(Boolean).join(" <i>or</i> ")}</span>` : "";
+    const leftHtml = solo.filter(p => b.left[p.name] > 0 || !pool.length).map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name]}</b></span>`).join("") + orLine;
     return `<button type="button" class="day ${full ? "full" : ""}" data-date="${b.date}" aria-pressed="${b.date === selBatch}">
       <div class="meta"><div class="dn">${fmtDay(b.date)}</div><div class="dd">${fmtDate(b.date)}</div>
-      <div class="left">${!rows.length ? "Open for pre-orders" : full ? "Sold out" : rows.map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name]}</b></span>`).join("")}</div></div>
+      <div class="left">${!rows.length ? "Open for pre-orders" : full ? "Sold out" : leftHtml}</div></div>
     </button>`;
   }).join("");
-  $("boardNote").textContent = "Everything is made to order. Tap a day to see what's left for it.";
+  $("boardNote").textContent = batches().some(b => typeof b.yogL === "number")
+    ? "Tap a day to see what's left. Tubs, drinks and minis share the same fresh yogurt, so it's one or the other: ordering tubs lowers the drinks and minis left, and the other way around."
+    : "Everything is made to order. Tap a day to see what's left for it.";
   $("prefBatch").textContent = selBatch ? fmtShort(selBatch) : "—";
   const ds = $("daySel");
   if (document.activeElement !== ds){
@@ -725,12 +734,13 @@ function renderMenu(){
     } else {
       rows = `<div class="flv"><span class="fn">${isSet(p) ? "Pieces" : "Quantity"}</span><span class="fp">${peso(p.price)}</span>${stepper(`p${i}`, title(p.name), cart[`p${i}`] || 0, canAdd)}</div>`;
     }
+    const shareNote = !p.off && poolOf(p) && poolL() != null && left !== Infinity ? `<p class="setnote" style="color:var(--ink-2);font-weight:500">Made from the same yogurt as our ${p.kg >= 0.3 ? "drinks and minis" : "tubs"}, so ordering either lowers what's left of both.</p>` : "";
     const setNote = isSet(p) ? (() => { const r = used % p.packQty; return r ? `<p class="setnote">Add ${p.packQty - r} more to finish a set of ${p.packQty}.</p>` : used ? `<p class="setnote ok">${used / p.packQty} set${used / p.packQty === 1 ? "" : "s"} of ${p.packQty}, ${peso(used / p.packQty * p.price)}</p>` : ""; })() : "";
     return `<article class="prod rv ${i % 2 ? "d-1" : ""} in${p.off ? " off" : ""}">
       <div class="ph"><img src="${src}" alt="${esc(alt)}" loading="lazy">${isSet(p) && !p.off ? `<span class="deal">${p.packQty} for ${peso(p.price)}, mix flavors</span>` : ""}${p.off ? `<span class="offtag">Unavailable</span>` : ""}</div>
       <div class="body">
         <div class="top"><h3>${esc(title(p.name))}</h3><span class="size">${esc(sizeOf(p.name))}</span></div>
-        ${stock}
+        ${stock}${shareNote}
         <div class="flavors">${rows}</div>
         ${setNote}
       </div>
