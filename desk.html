@@ -1958,7 +1958,12 @@ function renderStock(){
       +(makes?'<p class="muted small">'+esc(makes)+'</p>':'')
       +(yOn?'<p class="muted small">Today: '+r1(yt.start)+' carried + '+r1(yt.made)+' made − '+r1(yt.out)+' orders = <strong'+(yt.end<0?' class="neg"':'')+'>'+r1(yt.end)+' L tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the liters of regular yogurt you have.</p>')
       +'<div class="stkadd"><input id="yAdd" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="+ Liters" aria-label="Liters of regular yogurt made today"><button type="button" class="btn small" data-act="stkadd" data-k="y">Add</button>'
-      +(ySet!=null?'<span class="muted small">'+r1(ySet)+' L made today · <button type="button" class="stklink" data-act="stkundo" data-k="y">Undo</button></span>':'')+'</div>';
+      +(ySet!=null?'<span class="muted small">'+r1(ySet)+' L made today · <button type="button" class="stklink" data-act="stkundo" data-k="y">Undo</button></span>':'')+'</div>'
+      +'<p class="muted small" style="margin-top:10px">Liters of yogurt you expect for Mon, Wed and Fri (total for cups and drinks, before orders), then tap Save. Blank = only yogurt already in the fridge.</p>'
+      +'<div class="stkdays">'+greekMWF().map(function(k,i){
+        var ov=yogExp(k),ord=yogOut(k),dd=parseYmd(k),free=yogFreeOn(k);
+        return '<div class="field"><label for="yday-'+i+'">'+DOW[dd.getDay()]+' '+(dd.getMonth()+1)+'/'+dd.getDate()+' (L)</label><input id="yday-'+i+'" type="number" min="0" step="0.1" inputmode="decimal" data-yday="'+k+'" value="'+(ov==null?'':ov)+'"><span class="muted small">'+fmtL(ord)+' ordered · '+fmtL(free)+' left</span></div>';}).join('')+'</div>'
+      +'<div class="stkadd"><button type="button" class="btn small" data-act="ydaysave">Save</button></div>';
   }
   /* ---- Fix a count ---- */
   var fx=$('stkFix');
@@ -1978,9 +1983,13 @@ function renderStock(){
     var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set)');});
     html+='<h3>Yogurt &amp; drinks (liters)</h3>'+stkTable(stkDays(yogMap(),today),r1,today)+(bk.length?'<p class="muted small">Orders today: '+esc(bk.join(' · '))+'</p>':'');
   }
-  nx.innerHTML=html?html+'<p class="muted small">Greek: the shop sells the tubs you type for Mon, Wed and Fri on the Stock card; days you leave blank only use tubs already in the fridge. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
+  nx.innerHTML=html?html+'<p class="muted small">Greek and yogurt: the shop sells the tubs and liters you type for Mon, Wed and Fri on the Stock card; days you leave blank only use what is already in the fridge. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
+function yogExpSet(){if(!S.yogExpect||typeof S.yogExpect!=='object')S.yogExpect={};return S.yogExpect;}
+function yogExp(d){var v=yogExpSet()[d];return typeof v==='number'?v:null;}
+/* liters free on a day: what you expect for that day minus every order on it, else the fridge ledger */
+function yogFreeOn(d){var e=yogExp(d);return e!=null?Math.max(0,r2(e-yogOut(d))):yogAvail(d);}
 function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};return S.yogMade;}
 function yogLeft(){if(!S.yogLeft||typeof S.yogLeft!=='object')S.yogLeft={};return S.yogLeft;}
 function yogTotals(){if(!S.yogTotal||typeof S.yogTotal!=='object')S.yogTotal={};return S.yogTotal;}
@@ -2043,6 +2052,7 @@ function stockFor(date,name){
   var ov=S.capacity.stock[date];if(GREEK.test(name)&&ov&&typeof ov[name]==='number')return ov[name];
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
   var o=S.capacity.stock[date];if(o&&typeof o[name]==='number')return o[name];
+  if(isPool(name)&&yogExp(date)!=null)return Math.floor(yogFreeOn(date)/kgOf(name)+1e-9)+pcsOn(date,name);
   if(isPool(name)&&yogActive())return Math.floor(yogAvail(date)/kgOf(name)+1e-9)+pcsOn(date,name);
   return baseStock(parseYmd(date).getDay(),name);
 }
@@ -2557,6 +2567,12 @@ document.addEventListener('click',function(e){
     var td=ymd(new Date());Object.keys(S.capacity.stock).forEach(function(k){if(k<td)return;var dw=parseYmd(k).getDay(),so=S.capacity.stock[k];if([1,3,5].indexOf(dw)<0&&so&&gpn in so){delete so[gpn];if(!Object.keys(so).length)delete S.capacity.stock[k];}});
     if(bad){toast('Use whole numbers, 0 or more.');return;}
     saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Greek tubs saved.');}
+  else if(a==='ydaysave'){
+    var ye=yogExpSet(),ybad=false;
+    document.querySelectorAll('[data-yday]').forEach(function(el){var k=el.dataset.yday;if(el.value==='')delete ye[k];else if(Number(el.value)>=0)ye[k]=r2(Number(el.value));else ybad=true;});
+    var ytd=ymd(new Date());Object.keys(ye).forEach(function(k){if(k<ytd)delete ye[k];});
+    if(ybad){toast('Use liters, 0 or more.');return;}
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Yogurt liters saved.');}
   else if(a==='stkpanel'){var pn=$(t.dataset.p);if(pn){pn.hidden=!pn.hidden;t.setAttribute('aria-expanded',String(!pn.hidden));}}
   else if(a==='stkadd'){
     var isG=t.dataset.k==='g',inp=$(isG?'gAdd':'yAdd'),av=Number(inp.value),ad=ymd(new Date());
@@ -3007,7 +3023,7 @@ function shopSnapshot(){
     var left={};
     stockRows(k).forEach(function(x){left[x.p.name]=Math.max(0,Math.floor(x.left));});
     var o={date:k,label:batchName(k)||'Batch',left:left},man=S.capacity.stock[k];
-    if(yogActive()&&!(man&&Object.keys(man).some(function(n){return isPool(n)&&typeof man[n]==='number';})))o.yogL=yogAvail(k);
+    if((yogActive()||yogExp(k)!=null)&&!(man&&Object.keys(man).some(function(n){return isPool(n)&&typeof man[n]==='number';})))o.yogL=yogFreeOn(k);
     return o;
   });
   return {deliveryFee:num(S.deliveryFee),flavors:S.flavors.slice(),
