@@ -2015,7 +2015,10 @@ function yogLines(d){
 }
 function isPool(name){return !GREEK.test(name)&&kgOf(name)>0;}
 function yogActive(){return Object.keys(yogCounts()).length>0||Object.keys(yogLeft()).length>0||Object.keys(yogTotals()).length>0||Object.keys(yogMadeSet()).length>0||mem.batches.some(isRegular);}
-function yogMade(d){var m=yogMadeSet();if(m[d]!=null)return Number(m[d]);return r2(sum(mem.batches.filter(function(b){return isRegular(b)&&invDay(b)===d;}),litersOf));}
+/* a running regular batch counts its planned liters (recipe liters x size) on the day it will be packed,
+   so the shop can sell it right away; the liters you type when it's done replace the plan */
+function yogPlanned(b){if(!isRegular(b)||b.failed)return 0;return b.liters!=null?litersOf(b):litersPlan(b);}
+function yogMade(d){var m=yogMadeSet();if(m[d]!=null)return Number(m[d]);var t=ymd(new Date());return r2(sum(mem.batches.filter(function(b){if(!isRegular(b)||invDay(b)!==d)return false;return b.liters!=null||d>=addDays(t,-1);}),yogPlanned));}
 function yogOut(d){
   return r2(sum(yogLines(d),function(x){return piecesOf(x)*kgOf(x.product);}));
 }
@@ -2023,7 +2026,7 @@ var yogCache=null,yogCacheKey='';
 function yogMap(){
   var today=ymd(new Date()),last=addDays(today,28);
   mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});
-  var key=today+last+JSON.stringify(yogCounts())+JSON.stringify(yogLeft())+JSON.stringify(yogMadeSet())+JSON.stringify(yogTotals())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('')+(typeof webOrders!=='undefined'?webOrders.map(function(o){return o.id+o.preferredBatch;}).join(','):'');
+  var key=today+last+JSON.stringify(yogCounts())+JSON.stringify(yogLeft())+JSON.stringify(yogMadeSet())+JSON.stringify(yogTotals())+S.recipe.mixL+JSON.stringify(S.products.map(function(p){return p.kg;}))+mem.batches.filter(isRegular).map(function(b){return b.liters+''+JSON.stringify(b.at||{})+(b.done||[]).join('')+b.startAt+(b.packedAt||'')+(b.failed?'x':'')+b.size+invDay(b);}).join(',')+mem.reservations.map(function(r){return r.status+r.date+r.qty+r.product;}).join('')+mem.orders.map(function(o){return o.date+o.qty+o.product;}).join('')+(typeof webOrders!=='undefined'?webOrders.map(function(o){return o.id+o.preferredBatch;}).join(','):'');
   if(yogCache&&yogCacheKey===key)return yogCache;
   var counts=yogCounts(),totals=yogTotals(),lefts=yogLeft(),cdays=Object.keys(counts).concat(Object.keys(totals),Object.keys(lefts)).filter(function(k){return k<=last;}).sort(),from;
   if(cdays.length)from=cdays[cdays.length-1];
