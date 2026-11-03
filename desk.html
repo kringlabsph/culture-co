@@ -255,6 +255,8 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
 .stkadd{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
 .stkadd input{width:110px}
 .stklink{background:none;border:0;padding:0;font:inherit;color:#1F4D3A;text-decoration:underline;cursor:pointer}
+.stkdays{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:6px}
+.stkdays input{width:100%}
 .stklinks{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px;margin-top:8px}
 .stkpanel{margin-top:10px}
 .stkpanel h3{font-size:15px;margin:12px 0 4px}
@@ -1847,7 +1849,7 @@ function invExpMap(){
   }
   invExpCache=m;invExpKey=key;return m;
 }
-function invExpected(d){var m=invMadeSet();if(m[d]!=null)return 0;return invExpMap()[d]||0;}
+function invExpected(d){if(!S.greekAuto)return 0;var m=invMadeSet();if(m[d]!=null)return 0;return invExpMap()[d]||0;}
 /* tubs made that day: what you typed in "Packed", otherwise packed batches, plus what running/planned batches should give */
 function invMade(d){var m=invMadeSet();if(m[d]!=null)return Number(m[d]);return sum(mem.batches.filter(function(b){return invDay(b)===d;}),tubsOf)+invExpected(d);}
 function invOut(d){
@@ -1910,11 +1912,15 @@ function renderStock(){
   if(hasG&&!(g.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
     var gm=invMap();gt=gm.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
     gOn=S.prodDays.length||Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
-    var gNext=batchDates()[0]||today,gFree=Math.max(0,greekAvail(gNext)),gSet=invMadeSet()[today];
+    var gp=greekProd(),gNext=batchDates()[0]||today,gFree=Math.max(0,stockFor(gNext,gp.name)-pcsOn(gNext,gp.name)),gSet=invMadeSet()[today];
     g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gt.end<0?' neg':'')+'">'+(gOn?gFree+' <small>open for '+esc(gNext===today?'today':DOW[parseYmd(gNext).getDay()])+'</small>':'<small>Not counted yet</small>')+'</span></div>'
       +(gOn?'<p class="muted small">Today: '+gt.start+' carried + '+(gt.made-invExpected(today))+' packed'+(invExpected(today)?' + '+invExpected(today)+' expected':'')+' − '+gt.out+' orders = <strong'+(gt.end<0?' class="neg"':'')+'>'+gt.end+' tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the Greek tubs in your fridge.</p>')
       +'<div class="stkadd"><input id="gAdd" type="number" min="1" step="1" inputmode="numeric" placeholder="+ Packed" aria-label="Greek tubs packed today"><button type="button" class="btn small" data-act="stkadd" data-k="g">Add</button>'
-      +(gSet!=null?'<span class="muted small">'+gSet+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>';
+      +(gSet!=null?'<span class="muted small">'+gSet+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>'
+      +'<p class="muted small" style="margin-top:10px">Tubs you expect for each delivery day (total, before orders). Blank = only tubs already in the fridge.</p>'
+      +'<div class="stkdays">'+batchDates().filter(function(k){return k>=today;}).slice(0,4).map(function(k,i){
+        var ov=S.capacity.stock[k]&&typeof S.capacity.stock[k][gp.name]==='number'?S.capacity.stock[k][gp.name]:null,ord=pcsOn(k,gp.name),dd=parseYmd(k);
+        return '<div class="field"><label for="gday-'+i+'">'+DOW[dd.getDay()]+' '+(dd.getMonth()+1)+'/'+dd.getDate()+'</label><input id="gday-'+i+'" type="number" min="0" step="1" inputmode="numeric" data-stockd="'+k+'" data-pn="'+esc(gp.name)+'" placeholder="'+Math.max(0,greekAvail(k)+ord)+'" value="'+(ov==null?'':ov)+'"><span class="muted small">'+ord+' ordered · '+Math.max(0,stockFor(k,gp.name)-ord)+' left</span></div>';}).join('')+'</div>';
   }
   /* ---- regular yogurt (liters) ---- */
   var y=$('stkY');y.hidden=!hasY;
@@ -1947,7 +1953,7 @@ function renderStock(){
     var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set)');});
     html+='<h3>Yogurt &amp; drinks (liters)</h3>'+stkTable(stkDays(yogMap(),today),r1,today)+(bk.length?'<p class="muted small">Orders today: '+esc(bk.join(' · '))+'</p>':'');
   }
-  nx.innerHTML=html?html+'<p class="muted small">Greek: each batch counts as '+(Number(S.recipe.greekPerBatch)||4)+' tubs on its packing day, including batches you haven\'t started yet on your production days, until you type what you really packed. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
+  nx.innerHTML=html?html+'<p class="muted small">Greek: the shop sells the tubs you type for each delivery day on the Stock card; days you leave blank only use tubs already in the fridge. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
 function yogMadeSet(){if(!S.yogMade||typeof S.yogMade!=='object')S.yogMade={};return S.yogMade;}
@@ -2230,7 +2236,7 @@ function renderReserve(){
     $('resList').innerHTML=carHtml('res',slides,'batch');
     carInit('res');
   }
-  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt is open for pre-order from your production plan: every Greek batch counts as '+(Number(S.recipe.greekPerBatch)||4)+' tubs on its packing day, minus orders (including ones waiting for approval). For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
+  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt: type the tubs you expect for each delivery day on the Stock card (Production tab); the shop sells that minus orders, including ones waiting for approval. Days left blank only use tubs already in the fridge. For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el)el.checked=S.capacity.weekly[d]>0;});
   var tw=$('capTubsWeek');
   if(!tw.contains(document.activeElement)){
