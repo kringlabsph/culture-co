@@ -1830,9 +1830,12 @@ function invTotals(){if(!S.greekTotal||typeof S.greekTotal!=='object')S.greekTot
 var invExpCache=null,invExpKey='';
 function invExpMap(){
   var today=ymd(new Date()),last=addDays(today,35);
-  var key=today+JSON.stringify(S.prodDays)+S.startTime+JSON.stringify(S.steps)+JSON.stringify(S.packDays)+(S.skipStart||'')+S.recipe.greekPerBatch+mem.batches.map(function(b){return b.id+b.startAt+(b.packed==null?'n':b.packed)+(b.failed?'x':'')+(b.type||'')+b.size+JSON.stringify(b.at||{});}).join(',');
+  var key=today+JSON.stringify(invMadeSet())+JSON.stringify(invCounts())+JSON.stringify(invLeft())+JSON.stringify(invTotals())+JSON.stringify(S.prodDays)+S.startTime+JSON.stringify(S.steps)+JSON.stringify(S.packDays)+(S.skipStart||'')+S.recipe.greekPerBatch+mem.batches.map(function(b){return b.id+b.startAt+(b.packed==null?'n':b.packed)+(b.failed?'x':'')+(b.type||'')+b.size+JSON.stringify(b.at||{});}).join(',');
   if(invExpCache&&invExpKey===key)return invExpCache;
-  var m={},per=Number(S.recipe.greekPerBatch)||4,add=function(day,n){if(day<today)day=today;m[day]=(m[day]||0)+n;};
+  /* anything due on or before the last day you typed Packed or counted the fridge is already in that number,
+     and batches that were due before today are not expected any more */
+  var seen=[invMadeSet(),invCounts(),invLeft(),invTotals()].reduce(function(a,o){return a.concat(Object.keys(o).filter(function(k){return o[k]!=null&&k<=today;}));},[]).sort(),cut=seen.length?seen[seen.length-1]:'';
+  var m={},per=Number(S.recipe.greekPerBatch)||4,add=function(day,n){if(day<today||(cut&&day<=cut))return;m[day]=(m[day]||0)+n;};
   mem.batches.forEach(function(b){if(b.failed||isRegular(b)||b.packed!=null)return;var d=invDay(b);if(addDays(d,3)<today)return;add(d,tubsPlan(b));});
   var p=clockParts(),t0=new Date();
   for(var i=0;i<=28;i++){
@@ -2006,6 +2009,7 @@ function yogMakesText(L){
 }
 function renderYogInventory(){}
 function stockFor(date,name){
+  var ov=S.capacity.stock[date];if(GREEK.test(name)&&ov&&typeof ov[name]==='number')return ov[name];
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
   var o=S.capacity.stock[date];if(o&&typeof o[name]==='number')return o[name];
   if(isPool(name)&&yogActive())return Math.floor(yogAvail(date)/kgOf(name)+1e-9)+pcsOn(date,name);
@@ -2239,7 +2243,7 @@ function renderReserve(){
     for(var i=0;i<14;i++){
       var d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i),k2=ymd(d),cap=capFor(k2),used=usedOn(k2),left=cap-used,over2=left<-0.001,pct=cap>0?Math.min(100,used/cap*100):(used>0?100:0),bn=batchName(k2);
       var sub=cap<=0?'No delivery':(over2?'Over by '+r1(-left)+' '+bw(-left):(stockRows(k2).length?'':'No products limited yet'));
-      if(!start&&cap>0)start=k2;slides.push({key:k2,one:true,label:dateLabel(k2),html:'<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g)return '<div class="field"><label>'+prodDot(p.name)+esc(shortName(p.name))+' (tubs)</label><span class="small"><b>'+greekAvail(k2)+'</b> free to sell, from your Greek yogurt count</span><span class="muted small">'+used3+' pre-ordered</span></div>';return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>'});
+      if(!start&&cap>0)start=k2;slides.push({key:k2,one:true,label:dateLabel(k2),html:'<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g){var gov=S.capacity.stock[k2]&&typeof S.capacity.stock[k2][p.name]==='number'?S.capacity.stock[k2][p.name]:null;return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' (tubs, total for this day)</label><input id="'+id+'" type="number" min="0" step="1" inputmode="numeric" data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="'+(greekAvail(k2)+used3)+' (automatic)" value="'+(gov==null?'':gov)+'"><span class="muted small">'+used3+' pre-ordered'+(gov!=null?' · you set this; clear it to go back to automatic':'')+'</span></div>';}return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>'});
     }
     box.innerHTML='<span class="lbl" style="display:block;margin-top:14px">Change a single day</span><p class="muted small" style="margin:2px 0 8px">Only for exceptions: close one day, or change what is available for that day only.</p>'+carHtml('cap',slides,'day');
     carInit('cap',start);
@@ -2611,7 +2615,7 @@ document.addEventListener('change',function(e){
   }
   else if(t.dataset&&t.dataset.stockd){
     var sdk=t.dataset.stockd,sdn=t.dataset.pn,so=S.capacity.stock[sdk]||(S.capacity.stock[sdk]={}),sbase=baseStock(parseYmd(sdk).getDay(),sdn);
-    if(t.value==='')delete so[sdn];else{var sv3=Math.max(0,Math.round(num(t.value)));if(sv3===sbase)delete so[sdn];else so[sdn]=sv3;}
+    if(t.value==='')delete so[sdn];else{var sv3=Math.max(0,Math.round(num(t.value)));if(sv3===sbase&&!GREEK.test(sdn))delete so[sdn];else so[sdn]=sv3;}
     if(!Object.keys(so).length)delete S.capacity.stock[sdk];
     saveSettings();renderAll();
   }
