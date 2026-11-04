@@ -57,6 +57,11 @@ p{margin:0}
 .strip .s{background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .strip strong{font-family:var(--font-display);font-size:18px;line-height:1.2;font-variant-numeric:tabular-nums}
 .strip .k{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.strip .s.mix{grid-column:1/-1;gap:6px}
+.mixrow{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}
+.mixrow .mi{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.mixrow .mi b{font-family:var(--font-display);font-size:16px;font-variant-numeric:tabular-nums}
+.mixrow .mi .fl{color:var(--muted);font-size:12px}
 .banner{border-radius:16px;padding:12px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--warn-soft);color:var(--ink);border:1px solid var(--line)}
 .banner.info{background:var(--accent-soft)}
 .banner strong{font-weight:600}
@@ -377,6 +382,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
     <div class="s"><span class="k">Next batch</span><strong id="nextProd">-</strong><span class="muted small" id="nextProdSub"></span></div>
     <div class="s"><span class="k">Sales today</span><strong id="todaySales">-</strong><span class="muted small" id="todaySub"></span></div>
     <div class="s"><span class="k">Steps due</span><strong id="dueCount">0</strong><span class="muted small" id="dueSub"></span></div>
+    <div class="s mix"><span class="k">Sold today by product</span><div class="mixrow" id="todayMix"></div></div>
   </div>
 
   <div id="sampleBanner" class="banner info" hidden>
@@ -1024,6 +1030,16 @@ function renderStrip(){
   var t=ymd(new Date()),td=mem.orders.filter(function(o){return o.date===t;});
   $('todaySales').textContent=money(sum(td,function(o){return o.qty*o.price;}));
   var tn=countOrders(td);$('todaySub').textContent=tn+(tn===1?' order':' orders');
+  var mx={},mo=[];
+  td.filter(notFee).forEach(function(o){
+    var p=mx[o.product];if(!p){p=mx[o.product]={n:0,fl:{}};mo.push(o.product);}
+    p.n+=piecesOf(o);
+    if(o.flavors)Object.keys(o.flavors).forEach(function(f){p.fl[f]=(p.fl[f]||0)+(Number(o.flavors[f])||0);});
+  });
+  $('todayMix').innerHTML=mo.length?mo.map(function(name){
+    var p=mx[name],fk=Object.keys(p.fl).filter(function(f){return p.fl[f]>0;});
+    return '<span class="mi">'+prodDot(name)+esc(name)+' <b>'+p.n+'</b>'+(fk.length>1?'<span class="fl">('+fk.map(function(f){return esc(f)+' '+p.fl[f];}).join(', ')+')</span>':'')+'</span>';
+  }).join(''):'<span class="muted small">No sales yet today</span>';
   var sr=startReminder(),d=dueSteps().length+(sr&&sr.due?1:0);
   $('dueCount').textContent=d;
   $('dueSub').textContent=d?'waiting on you':'all caught up';
