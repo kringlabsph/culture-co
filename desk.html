@@ -1396,7 +1396,7 @@ function soldList(ord){
   var top=m[keys[0]].n||1,tot=sum(keys,function(k){return m[k].n;});
   return '<p class="muted small" style="margin:0 0 8px">'+tot+(tot===1?' piece':' pieces')+' sold in '+esc(monthLabel(curMonth))+'</p><div class="bars sold">'+keys.map(function(k){
     var p=m[k],fk=Object.keys(p.fl).filter(function(f){return p.fl[f]>0;}).sort(function(a,b){return p.fl[b]-p.fl[a];});
-    return '<div class="bar"><span class="nm" title="'+esc(k)+'">'+prodDot(k)+esc(shortName(k))+((/@\s*(.+)$/.exec(k)||[,''])[1]?' <span class="muted">'+esc((/@\s*(.+)$/.exec(k))[1])+'</span>':'')+'</span><span class="track"><span class="fill rev" style="display:block;width:'+Math.max(2,p.n/top*100)+'%"></span></span><span class="amt"><b>'+p.n+'</b> <span class="muted small">'+money(p.sales)+'</span></span>'
+    return '<div class="bar"><span class="nm" title="'+esc(k)+'">'+prodDot(k)+esc(shortName(k))+((/@\s*(.+)$/.exec(k)||[,''])[1]?' <span class="muted">'+esc((/@\s*(.+)$/.exec(k))[1])+'</span>':'')+'</span><span class="track"><span class="fill rev" style="display:block;width:'+Math.max(2,p.n/top*100)+'%"></span></span><span class="amt"><b>'+p.n+'</b></span>'
       +(fk.length>1?'<span class="fl muted small">'+fk.map(function(f){return esc(f)+' '+p.fl[f];}).join(' · ')+'</span>':'')+'</div>';
   }).join('')+'</div>';
 }
