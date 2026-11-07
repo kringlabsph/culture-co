@@ -3137,16 +3137,16 @@ function renderWebNotes(){
 function todayOffer(){
   var k=ymd(new Date());if(capFor(k)>0)return null;
   var left={},any=false,g=gFridge()==null?0:Math.min(greekAvail(k),greekAvail(k,true)),yl=yogActive()?yogAvail(k):0;
-  S.products.forEach(function(p){var n=0;if(GREEK.test(p.name))n=g;else if(isPool(p.name))n=Math.floor(yl/kgOf(p.name)+1e-9);if(p.off)n=0;left[p.name]=Math.max(0,n);if(n>0)any=true;});
-  return any?{date:k,label:'Today',left:left,sameDay:true,yogL:yl}:null;
+  /* same-day is only for Greek tubs already in the fridge */
+  S.products.forEach(function(p){var n=GREEK.test(p.name)&&!p.off?g:0;left[p.name]=Math.max(0,n);if(n>0)any=true;});
+  return any?{date:k,label:'Today',left:left,sameDay:true}:null;
 }
 function shopSnapshot(){
   var batches=batchDates().filter(function(k){return !annPaused(k);}).slice(0,6).map(function(k){
     var left={};
-    stockRows(k).forEach(function(x){left[x.p.name]=Math.max(0,Math.floor(x.left));});
-    var o={date:k,label:batchName(k)||'Batch',left:left},man=S.capacity.stock[k];
-    if((yogActive()||yogExp(k)!=null)&&!(man&&Object.keys(man).some(function(n){return isPool(n)&&typeof man[n]==='number';})))o.yogL=yogFreeOn(k);
-    return o;
+    /* only Greek tubs are limited on the website; yogurt cups and drinks are open for pre-orders and scheduled by queue */
+    stockRows(k).forEach(function(x){if(GREEK.test(x.p.name))left[x.p.name]=Math.max(0,Math.floor(x.left));});
+    return {date:k,label:batchName(k)||'Batch',left:left};
   });
   return {deliveryFee:num(S.deliveryFee),flavors:S.flavors.slice(),
     products:S.products.map(function(p){return {name:p.name,price:num(p.price),packQty:Math.max(1,Number(p.packQty)||1),flavored:!!p.flavored,flavors:p.flavored?offered(p):[],greek:GREEK.test(p.name),kg:Number(p.kg)||0,color:p.color==null?null:p.color,off:!!p.off};}),

@@ -697,13 +697,14 @@ function renderBatches(){
   $("days").innerHTML = list.map(b => {
     const rows = shop.products.filter(p => !p.off && b.left && typeof b.left[p.name] === "number");
     const total = rows.reduce((a,p) => a + b.left[p.name], 0);
-    const full = rows.length && total <= 0;
+    const open = shop.products.some(p => !p.off && !(b.left && typeof b.left[p.name] === "number"));
+    const full = rows.length && total <= 0 && !open;
     /* tubs, drinks and minis come out of the same yogurt: show them as one "or" line, not as separate stock */
     const shared = typeof b.yogL === "number", solo = rows.filter(p => !(shared && poolOf(p)));
     const pool = shared ? rows.filter(poolOf) : [], big = pool.filter(p => p.kg >= 0.3), small = pool.filter(p => p.kg < 0.3);
     const maxOf = l => l.length ? Math.max(...l.map(p => b.left[p.name])) : 0;
     const orLine = pool.length && maxOf(pool) > 0 ? `<span class="orl">${[big.length ? `<b>${maxOf(big)}</b> tubs` : "", small.length ? `<b>${maxOf(small)}</b> drinks or minis` : ""].filter(Boolean).join(" <i>or</i> ")}</span>` : "";
-    const leftHtml = solo.filter(p => b.left[p.name] > 0 || !pool.length).map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name]}</b></span>`).join("") + orLine;
+    const leftHtml = solo.filter(p => b.left[p.name] > 0 || !pool.length).map(p => `<span>${esc(title(p.name))} <b>${b.left[p.name] > 0 ? b.left[p.name] + " left" : "sold out"}</b></span>`).join("") + orLine + (open ? `<span>Yogurt &amp; drinks <b>open</b></span>` : "");
     return `<button type="button" class="day ${full ? "full" : ""}" data-date="${b.date}" aria-pressed="${b.date === selBatch}">
       <div class="meta"><div class="dn">${fmtDay(b.date)}</div><div class="dd">${fmtDate(b.date)}</div>
       <div class="left">${!rows.length ? "Open for pre-orders" : full ? "Sold out" : leftHtml}</div></div>
