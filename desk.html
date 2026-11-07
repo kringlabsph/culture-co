@@ -3510,12 +3510,14 @@ function histSummary(list){
     +(hist.docs.length>=hist.limit&&hist.p==='all'?'<p class="muted small">Based on the latest '+hist.docs.length+' orders. Tap "Show older orders" below to include more.</p>':'');
 }
 function histRow(o){
+  if(!hist.armDel)hist.armDel={};
   var st=histStatus(o),w=histWhen(o),del=o.fulfilment==='delivery',ph=webPhone(o.contact);
   var dateTxt=o.date?(del?'Delivery ':'Pickup ')+dateLabel(o.date):o.preferredBatch?(del?'Wanted delivery ':'Wanted pickup ')+dateLabel(o.preferredBatch):(del?'Delivery':'Pickup');
   var when=o.declinedAt&&st.k==='declined'?' · declined '+new Date(o.declinedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):o.cancelledAt&&st.k==='cancelled'?' · cancelled '+new Date(o.cancelledAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   var acts='';
   if(st.k==='declined')acts+='<button type="button" class="btn small quiet" data-act="histreopen" data-id="'+esc(o.id)+'">'+(hist.arm[o.id]?'Tap again to reopen':'Reopen')+'</button>';
   if(ph)acts+='<a class="btn small quiet" href="tel:'+esc(ph)+'">Call</a>';
+  acts+='<button type="button" class="btn small danger" data-act="histdel" data-id="'+esc(o.id)+'">'+(hist.armDel[o.id]?'Tap again to delete':'Delete')+'</button>';
   return '<li class="hrow"><div class="main"><strong>#'+esc(o.queueNumber||'?')+' '+esc(o.name||'No name')+' <span class="pill '+st.c+'">'+esc(st.t)+'</span></strong>'
     +'<span class="muted small">'+(w?esc(w.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})):'Just now')+' · '+esc(dateTxt)+esc(when)+'</span>'
     +'<span class="small">'+esc(histItems(o))+' · <b>'+money(histTotal(o))+'</b></span>'
@@ -3559,6 +3561,19 @@ function histCsv(){
   hist.docs.forEach(function(o){var w=histWhen(o);rows.push([o.queueNumber||'',o.id,w?w.toISOString():'',o.name||'',o.contact||'',o.fulfilment==='delivery'?'Delivery':'Pickup',o.date||o.preferredBatch||'',histStatus(o).t,histItems(o),histTotal(o),o.address||'',o.notes||'']);});
   saveFile('culture-co-order-history-'+ymd(new Date())+'.csv',csv(rows));
 }
+/* delete a wrong record: removes the website order, and any of its pre-order lines in Desk that are not checked as sold yet */
+function histDelete(id){
+  if(!hist.armDel)hist.armDel={};
+  if(!hist.armDel[id]){hist.armDel[id]=1;renderHist();setTimeout(function(){delete hist.armDel[id];renderHist();},4000);return;}
+  delete hist.armDel[id];
+  var linked=mem.reservations.filter(function(r){return r.webId===id;}),open=linked.filter(function(r){return r.status==='reserved';}),sold=linked.filter(function(r){return r.status==='converted';}).length;
+  web.fs.collection('orders').doc(id).delete()
+    .then(function(){
+      var chain=Promise.resolve();open.forEach(function(r){chain=chain.then(function(){return del('reservations',r.id,true);});});
+      return chain.then(function(){renderAll();toast(sold?'Deleted. It was already checked as sold, so delete it from Orders too if that was wrong.':'Order deleted.');});
+    })
+    .catch(function(e){toast(e&&e.code==='permission-denied'?'Firebase did not allow the delete. Allow delete on orders for the shop account in your Firestore rules.':'Could not delete. Try again.');});
+}
 function histReopen(id){
   if(!hist.arm[id]){hist.arm[id]=1;renderHist();setTimeout(function(){delete hist.arm[id];renderHist();},4000);return;}
   delete hist.arm[id];histReopened[id]=1;
@@ -3574,6 +3589,7 @@ document.addEventListener('click',function(e){
   else if(a==='histmore'){hist.limit+=100;histListen();}
   else if(a==='histcsv')histCsv();
   else if(a==='histreopen')histReopen(b.dataset.id);
+  else if(a==='histdel')histDelete(b.dataset.id);
   else if(a==='topiccopy')copyText(ALERT_TOPIC,'Topic copied. Paste it in the ntfy app.');
   else if(a==='topictest'){ntfySend('Test alert from Desk','If you see this on your phone, order alerts are working.','white_check_mark').then(function(){toast('Test sent. Check the ntfy app.');});}
 });
