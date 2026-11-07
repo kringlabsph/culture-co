@@ -208,6 +208,12 @@ details>.inner{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
 .bar .fill{height:100%;background:var(--exp);border-radius:5px}
 .bar .fill.rev{background:var(--rev)}
 .bar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bars.sold .bar{grid-template-columns:minmax(0,150px) minmax(0,1fr) auto}
+.bars.sold .amt b{font-size:16px}
+.bars.sold .fl{grid-column:1/-1;margin-top:-6px}
+.gsum{display:flex;flex-wrap:wrap;gap:4px 10px;margin:6px 0 2px;font-size:14px}
+.gsum b{font-size:16px}
+.gsum .neg{color:#b42318}
 .scroll{overflow-x:auto}
 svg.chart{display:block;width:100%;min-width:480px;height:auto}
 svg.chart text{fill:var(--muted);font-size:11px;font-family:var(--font-body)}
@@ -427,7 +433,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <span class="lbl">Pack on</span>
+        <span class="lbl">Pack for (you pack the evening before)</span>
         <div class="chips" id="packChips" role="group" aria-label="Pack days">
           <button type="button" class="chip" data-act="pdow" data-d="1">Mon</button>
           <button type="button" class="chip" data-act="pdow" data-d="2">Tue</button>
@@ -439,7 +445,8 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
         </div>
       </div>
       <div class="form">
-        <div class="field"><label for="startTime">Morning start time</label><input id="startTime" type="time" value="06:00"></div>
+        <div class="field"><label for="startTime">Batch start time</label><input id="startTime" type="time" value="19:00"></div>
+        <div class="field"><label for="packTime">Pack time (evening before)</label><input id="packTime" type="time" value="19:00"></div>
       </div>
     </div>
 
@@ -744,7 +751,7 @@ table.t thead th{border-top:0;font-size:12px;color:var(--muted);font-weight:600}
     </div>
     <div class="card"><h3>Sales per day</h3><div class="scroll" id="sumChart"></div></div>
     <div class="two">
-      <div class="card"><h3>Products</h3><div id="sumProducts"></div></div>
+      <div class="card"><h3>Products sold</h3><div id="sumProducts"></div></div>
       <div class="card"><h3>Customers</h3><div id="sumCustomers"></div></div>
     </div>
     <div class="card" id="sumMoney"></div>
@@ -839,7 +846,7 @@ var DEFAULT_STEPS=[
   {label:'Pack the strained yogurt',mins:0,mode:'packday'}
 ];
 function defaults(){return {
-  stepsVersion:2,prodDays:[0,1,2,3,4,5,6],packDays:[1,3,5,6,0],startTime:'06:00',batchSeq:0,
+  stepsVersion:2,prodDays:[0,1,2,3,4,5,6],packDays:[1,3,5,6,0],startTime:'19:00',packTime:'19:00',batchSeq:0,
   recipe:{batches:1,waterCups:14,cupMl:250,powderG:875,starterG:125,mixL:4,tubG:350,greekPerBatch:4},greek4:1,
   fill:{type:'greek',plain:'jam',qty:10,tub:{yogurt:500,sugar:30,jam:60},drink:{yogurt:100,water:100,sugar:12,jam:16}},
   steps:DEFAULT_STEPS.map(function(s){return {label:s.label,mins:s.mins,mode:s.mode};}),
@@ -867,6 +874,11 @@ function applySettings(d){
   S=merge(fresh,d||{});
   if(!d||d.stepsVersion!==2){S.steps=fresh.steps;S.prodDays=fresh.prodDays;S.packDays=fresh.packDays;S.stepsVersion=2;}
   if(!Array.isArray(S.steps)||!S.steps.length)S.steps=fresh.steps;
+  /* evening routine: start batches at 7 PM and pack at 7 PM the evening before each pack-for day */
+  if(!S.evening1){S.startTime='19:00';S.packTime='19:00';S.evening1=1;}
+  if(!/^\d\d:\d\d$/.test(S.packTime||''))S.packTime='19:00';
+  /* Greek extra tubs used to mean the total for the day; they now mean extra on top of the fridge, so old totals are cleared */
+  if(!S.greekV2){var gpo=(S.products||[]).find(function(p){return /greek/i.test(p.name);});if(gpo&&S.capacity&&S.capacity.stock)Object.keys(S.capacity.stock).forEach(function(k){var so=S.capacity.stock[k];if(so&&gpo.name in so){delete so[gpo.name];if(!Object.keys(so).length)delete S.capacity.stock[k];}});S.greekV2=1;}
   if(!S.manualStrain){S.steps.forEach(function(s){if(s.mode==='morning'&&/strain/i.test(s.label))s.mode='manual';});S.manualStrain=1;}
   if(!S.mix4){if(S.recipe&&Number(S.recipe.mixL)===3.9)S.recipe.mixL=4;S.mix4=1;}
   if(!S.mix4b){if(Number(S.recipe.mixL)===3.9)S.recipe.mixL=4;S.mix4b=1;}
@@ -960,11 +972,15 @@ function nextClock(t){
   if(c.getTime()<=t)c=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,p[0],p[1]);
   return c.getTime();
 }
+function packParts(){var p=String(S.packTime||'19:00').split(':').map(Number);return [p[0]||0,p[1]||0];}
+/* packing happens at pack time on the evening BEFORE a pack-for day, never earlier than the batch is ready */
 function nextPackTime(t){
-  var days=S.packDays;if(!days.length)return t;
-  var d=new Date(t);if(days.indexOf(d.getDay())>=0)return t;
-  var p=clockParts();
-  for(var k=1;k<=7;k++){var c=new Date(d.getFullYear(),d.getMonth(),d.getDate()+k,p[0],p[1]);if(days.indexOf(c.getDay())>=0)return c.getTime();}
+  var days=S.packDays,p=packParts(),d=new Date(t);
+  for(var k=0;k<=8;k++){
+    var c=new Date(d.getFullYear(),d.getMonth(),d.getDate()+k,p[0],p[1]);if(c.getTime()<t)continue;
+    var nx=new Date(c.getFullYear(),c.getMonth(),c.getDate()+1).getDay();
+    if(!days.length||days.indexOf(nx)>=0)return c.getTime();
+  }
   return t;
 }
 function stepMode(s){return (s.mode==='morning'&&/strain/i.test(s.label))?'manual':s.mode;}
@@ -1124,6 +1140,7 @@ function renderProduction(){
   document.querySelectorAll('#dowChips .chip').forEach(function(c){c.setAttribute('aria-pressed',S.prodDays.indexOf(Number(c.dataset.d))>=0);});
   document.querySelectorAll('#packChips .chip').forEach(function(c){c.setAttribute('aria-pressed',S.packDays.indexOf(Number(c.dataset.d))>=0);});
   if(document.activeElement!==$('startTime'))$('startTime').value=S.startTime;
+  if(document.activeElement!==$('packTime'))$('packTime').value=S.packTime||'19:00';
   updatePreview();
   if(!startTouched&&document.activeElement!==$('bStart'))$('bStart').value=localDT(new Date());
   var bst=new Date($('bStart').value).getTime();$('bName').placeholder=weekBatchName(isFinite(bst)?bst:Date.now());
@@ -1159,7 +1176,7 @@ function renderProduction(){
   if(!ed.contains(document.activeElement)){
     ed.innerHTML=S.steps.map(function(s,i){
       var sel=i===0?'<select id="step-mode-'+i+'" disabled aria-label="When step 1 starts"><option>At batch start</option></select>'
-        :'<select id="step-mode-'+i+'" data-step="mode" data-i="'+i+'" aria-label="When step '+(i+1)+' starts"><option value="after"'+(s.mode==='after'?' selected':'')+'>Right after the step before</option><option value="morning"'+(s.mode==='morning'?' selected':'')+'>Next morning at start time</option><option value="packday"'+(s.mode==='packday'?' selected':'')+'>On the next pack day</option><option value="manual"'+(s.mode==='manual'?' selected':'')+'>I enter the time on each batch</option></select>';
+        :'<select id="step-mode-'+i+'" data-step="mode" data-i="'+i+'" aria-label="When step '+(i+1)+' starts"><option value="after"'+(s.mode==='after'?' selected':'')+'>Right after the step before</option><option value="morning"'+(s.mode==='morning'?' selected':'')+'>Next day at start time</option><option value="packday"'+(s.mode==='packday'?' selected':'')+'>On the next pack day</option><option value="manual"'+(s.mode==='manual'?' selected':'')+'>I enter the time on each batch</option></select>';
       return '<div class="srow"><input id="step-label-'+i+'" data-step="label" data-i="'+i+'" value="'+esc(s.label)+'" aria-label="Step '+(i+1)+' name" maxlength="80">'+sel+'<input id="step-mins-'+i+'" type="number" min="0" step="5" inputmode="numeric" data-step="mins" data-i="'+i+'" value="'+s.mins+'" aria-label="Minutes to wait after step '+(i+1)+'" title="Minutes to wait after this step"><button type="button" class="btn small danger" data-act="steprm" data-i="'+i+'" aria-label="Remove step '+(i+1)+'"'+(S.steps.length<2?' disabled':'')+'>Remove</button></div>';
     }).join('');
   }
@@ -1366,6 +1383,23 @@ function rankList(rows,kind){
   var top=rows[0].sales||1;
   return '<div class="bars">'+rows.map(function(r){return '<div class="bar"><span class="nm" title="'+esc(r.name)+'">'+(kind==='p'?prodDot(r.name):'')+esc(r.name)+'</span><span class="track"><span class="fill rev" style="display:block;width:'+Math.max(2,r.sales/top*100)+'%"></span></span><span class="amt">'+money(r.sales)+'</span></div>';}).join('')+'</div>';
 }
+/* every product sold this month: pieces, flavors and sales, most pieces first */
+function soldList(ord){
+  var m={},keys=[];
+  ord.filter(notFee).forEach(function(o){
+    var p=m[o.product];if(!p){p=m[o.product]={n:0,sales:0,fl:{}};keys.push(o.product);}
+    p.n+=piecesOf(o);p.sales+=o.qty*o.price;
+    if(o.flavors)Object.keys(o.flavors).forEach(function(f){p.fl[f]=(p.fl[f]||0)+(Number(o.flavors[f])||0);});
+  });
+  if(!keys.length)return emptyBox('Nothing sold yet.');
+  keys.sort(function(a,b){return m[b].n-m[a].n;});
+  var top=m[keys[0]].n||1,tot=sum(keys,function(k){return m[k].n;});
+  return '<p class="muted small" style="margin:0 0 8px">'+tot+(tot===1?' piece':' pieces')+' sold in '+esc(monthLabel(curMonth))+'</p><div class="bars sold">'+keys.map(function(k){
+    var p=m[k],fk=Object.keys(p.fl).filter(function(f){return p.fl[f]>0;}).sort(function(a,b){return p.fl[b]-p.fl[a];});
+    return '<div class="bar"><span class="nm" title="'+esc(k)+'">'+prodDot(k)+esc(shortName(k))+((/@\s*(.+)$/.exec(k)||[,''])[1]?' <span class="muted">'+esc((/@\s*(.+)$/.exec(k))[1])+'</span>':'')+'</span><span class="track"><span class="fill rev" style="display:block;width:'+Math.max(2,p.n/top*100)+'%"></span></span><span class="amt"><b>'+p.n+'</b> <span class="muted small">'+money(p.sales)+'</span></span>'
+      +(fk.length>1?'<span class="fl muted small">'+fk.map(function(f){return esc(f)+' '+p.fl[f];}).join(' · ')+'</span>':'')+'</div>';
+  }).join('')+'</div>';
+}
 function renderSummary(){
   var ord=monthOrders(curMonth),prev=monthOrders(prevMonth(curMonth));
   var sales=sum(ord,function(o){return o.qty*o.price;}),psales=sum(prev,function(o){return o.qty*o.price;});
@@ -1388,7 +1422,7 @@ function renderSummary(){
   $('sumChart').innerHTML=chartSvg(daily,best);
   var pm={},cm={};
   ord.forEach(function(o){if(!o.fee){var p=pm[o.product]||(pm[o.product]={qty:0,n:0,sales:0});p.qty+=piecesOf(o);p.n++;p.sales+=o.qty*o.price;}var c=o.customer||'Walk-in',q=cm[c]||(cm[c]={qty:0,n:0,sales:0});q.qty+=o.qty;q.n++;q.sales+=o.qty*o.price;});
-  $('sumProducts').innerHTML=rankList(rank(pm),'p');$('sumCustomers').innerHTML=rankList(rank(cm));
+  $('sumProducts').innerHTML=soldList(ord);$('sumCustomers').innerHTML=rankList(rank(cm));
   var coll=sum(ord.filter(function(o){return o.paid;}),function(o){return o.qty*o.price;}),ex=sum(monthExp(curMonth),function(e){return e.amount;});
   $('sumMoney').innerHTML='<h3>Cash for the month</h3><div class="tiles">'+tile(money(coll),'Collected')+tile(money(sales-coll),'Still to collect',sales-coll>0?'neg':'')+tile(money(ex),'Expenses')+tile(money(coll-ex),'Profit',coll-ex>0?'pos':coll-ex<0?'neg':'')+'</div>';
 }
@@ -1627,7 +1661,8 @@ function packProg(){
   $('packProg').textContent=lines.length?n+' of '+lines.length+' items packed':'';
 }
 function renderPack(){
-  if(!packDay)packDay=nextPackDay(ymd(new Date()));
+  /* from mid-afternoon on, show tomorrow's list: you pack in the evening for the next day */
+  if(!packDay){var pn=new Date();packDay=nextPackDay(pn.getHours()>=15?addDays(ymd(pn),1):ymd(pn));}
   var pk=$('packPick');if(document.activeElement!==pk)pk.value=packDay;
   if($('packList').contains(document.activeElement))return;
   var lines=packLines(packDay),t=S.packTicks[packDay]||[];
@@ -1705,7 +1740,7 @@ function renderBook(){
   });
   var list=Object.keys(c).map(function(k){var r=c[k];r.n=Object.keys(r.g).length;return r;}).filter(function(r){return !q||r.name.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return b.spent-a.spent;});
   if(!list.length){box.innerHTML=emptyBox(q?'No customer matches that.':'Customers appear here once you save orders with a name.');return;}
-  box.innerHTML='<ul class="list">'+list.map(function(r){
+  var rowHtml=function(r){
     var open=bookOpen===r.name,fav=Object.keys(r.prods).sort(function(a,b){return r.prods[b]-r.prods[a];})[0];
     var head='<button type="button" class="bookrow" data-act="bookopen" data-name="'+esc(r.name)+'" aria-expanded="'+open+'"><span><strong>'+esc(r.name)+'</strong>'+(r.n>=3?' <span class="pill good">Regular</span>':'')+(r.unpaid>0?' <span class="pill warn">Owes '+money(r.unpaid)+'</span>':'')+'<br><span class="muted small">'+r.n+(r.n===1?' order':' orders')+', last '+parseYmd(r.last).toLocaleDateString('en-US',{day:'numeric',month:'short'})+', usually '+prodDot(fav)+esc(fav)+'</span></span><span class="amt">'+money(r.spent)+'</span></button>';
     var det='';
@@ -1715,7 +1750,13 @@ function renderBook(){
       det='<div class="bookdetail"><span class="muted small">Customer since '+parseYmd(r.first).toLocaleDateString('en-US',{month:'long',year:'numeric'})+(waiting?', '+waiting+(waiting===1?' pre-order waiting':' pre-orders waiting'):'')+'</span><div class="olines">'+gs.map(function(g){var l0=g.lines[0];return '<div class="ol"><span>'+parseYmd(l0.date).toLocaleDateString('en-US',{day:'numeric',month:'short'})+': '+g.lines.map(function(l){return l.fee?'delivery':qtyText(l)+' × '+esc(l.product)+esc(flavInline(l));}).join(', ')+(g.lines.every(function(l){return l.paid;})?'':' (unpaid)')+'</span><span>'+money(sum(g.lines,function(l){return l.qty*l.price;}))+'</span></div>';}).join('')+'</div><div class="actions"><button type="button" class="btn small" data-act="booknew" data-name="'+esc(r.name)+'">New order</button>'+(r.unpaid>0?'<button type="button" class="btn small quiet" data-act="bookremind" data-name="'+esc(r.name)+'">Copy reminder</button>':'')+'</div></div>';
     }
     return '<li style="flex-direction:column;align-items:stretch;gap:0">'+head+det+'</li>';
-  }).join('')+'</ul>';
+  };
+  /* 5 customers per page; swipe or use the arrows for more */
+  var PER=5,slides=[];
+  for(var i=0;i<list.length;i+=PER){var pg=list.slice(i,i+PER);slides.push({key:'p'+(i/PER),label:'Customers '+(i+1)+' to '+(i+pg.length),html:'<ul class="list">'+pg.map(rowHtml).join('')+'</ul>'});}
+  var openPage=0;if(bookOpen){var oi=list.findIndex(function(r){return r.name===bookOpen;});if(oi>=0)openPage=Math.floor(oi/PER);}
+  box.innerHTML='<p class="muted small" style="margin:0 0 6px">'+list.length+(list.length===1?' customer':' customers')+'</p>'+carHtml('book',slides,'page');
+  carInit('book','p'+openPage);
 }
 function renderAllExtras(){syncMode('o');syncMode('r');renderPack();renderProfit();renderBook();renderFlv('o');renderFlv('r');renderFlv('ra');}
 function piecesOf(l){return l.fee?0:(Number(l.qty)||0)*Math.max(1,Number(l.pack)||1);}
@@ -1939,10 +1980,53 @@ function invMap(){
   invCache={rows:m,last:last};invCacheKey=key;return invCache;
 }
 function invEnd(d){var m=invMap().rows;if(m[d])return m[d].end;var keys=Object.keys(m).sort().filter(function(k){return k<d;});return keys.length?m[keys[keys.length-1]].end:0;}
-function greekAvail(D){
-  var m=invMap(),min=Infinity;
-  for(var d=D;d<=m.last;d=addDays(d,1)){var e=m.rows[d]?m.rows[d].end:invEnd(d);if(e<min)min=e;}
-  return Math.max(0,min===Infinity?invEnd(D):min);
+/* ---------- Greek tubs, simple version ----------
+   In the fridge = your last count + tubs packed since − Greek orders checked as sold since.
+   Waiting = approved pre-orders not checked yet + online orders waiting for approval.
+   Free = fridge − waiting. Extra tubs you type for a delivery day are added on top for that day and later. */
+function gFridgeBase(){var f=S.greekFridge;return f&&typeof f==='object'&&typeof f.n==='number'?f:null;}
+function gPackLog(){if(!Array.isArray(S.greekPacks))S.greekPacks=[];return S.greekPacks;}
+function gPcs(list){return sum(list.filter(function(x){return !x.fee&&GREEK.test(x.product);}),piecesOf);}
+function gWebPcs(o){return sum((o.items||[]).filter(function(it){return GREEK.test(it.product);}),function(it){return (Number(it.qty)||0)*Math.max(1,Number(it.pack)||1);});}
+/* tubs packed after the count: per day, what you typed with "+ Packed" wins over the batch's Packed box (so nothing is counted twice) */
+function gPackedSince(at){
+  var byDay={},man={};
+  gPackLog().forEach(function(p){if(p.at>at){var d=ymd(new Date(p.at));man[d]=(man[d]||0)+(Number(p.n)||0);}});
+  mem.batches.forEach(function(b){if(b.failed||isRegular(b)||b.packed==null)return;var t=b.packedAt||b.startAt;if(!(t>at))return;var d=ymd(new Date(t));byDay[d]=(byDay[d]||0)+tubsOf(b);});
+  Object.keys(man).forEach(function(d){byDay[d]=man[d];});
+  return sum(Object.keys(byDay),function(d){return byDay[d];});
+}
+function gSoldSince(at){return gPcs(mem.orders.filter(function(o){return (o.created||0)>at;}));}
+function gFridge(){var f=gFridgeBase();if(!f)return null;return Math.round(f.n+gPackedSince(f.at)-gSoldSince(f.at));}
+function gPackedToday(){var t=ymd(new Date());return gPackLog().some(function(p){return ymd(new Date(p.at))===t;})||mem.batches.some(function(b){return !b.failed&&!isRegular(b)&&b.packed!=null&&b.packedAt&&ymd(new Date(b.packedAt))===t;});}
+/* extra tubs you plan to make for a day; today's stops counting once you add today's packed tubs */
+function gExtra(d){
+  var gp=greekProd();if(!gp)return 0;var so=S.capacity.stock[d],v=so&&typeof so[gp.name]==='number'?so[gp.name]:0,t=ymd(new Date());
+  if(!v||d<t||(d===t&&gPackedToday()))return 0;return v;
+}
+function gWaitOn(d){
+  var r=gPcs(mem.reservations.filter(function(x){return x.status==='reserved'&&x.date===d;}));
+  var w=sum((typeof webOrders!=='undefined'?webOrders:[]).filter(function(o){return o.preferredBatch===d;}),gWebPcs);
+  return r+w;
+}
+function gWaitAll(){
+  return gPcs(mem.reservations.filter(function(x){return x.status==='reserved';}))+sum(typeof webOrders!=='undefined'?webOrders:[],gWebPcs);
+}
+function gHorizon(){var last=addDays(ymd(new Date()),28);mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date>last)last=r.date;});(typeof webOrders!=='undefined'?webOrders:[]).forEach(function(o){if(o.preferredBatch&&o.preferredBatch>last)last=o.preferredBatch;});return last;}
+/* running totals: supply (fridge + extras up to that day) minus waiting orders up to that day */
+function gCurve(withExtras){
+  var t=ymd(new Date()),F=gFridge()||0,last=gHorizon(),ext=0,wt=0,out=[];
+  /* unchecked orders dated before today still need tubs from the fridge */
+  mem.reservations.forEach(function(r){if(r.status==='reserved'&&r.date<t)wt+=gPcs([r]);});
+  (typeof webOrders!=='undefined'?webOrders:[]).forEach(function(o){if(!o.preferredBatch||o.preferredBatch<t)wt+=gWebPcs(o);});
+  for(var d=t;d<=last;d=addDays(d,1)){if(withExtras)ext+=gExtra(d);wt+=gWaitOn(d);out.push({d:d,ext:ext,wait:wt,bal:F+ext-wt});}
+  return out;
+}
+function greekAvail(D,noExtras){
+  var c=gCurve(!noExtras),min=Infinity;
+  c.forEach(function(r){if(r.d>=D&&r.bal<min)min=r.bal;});
+  if(min===Infinity)min=(gFridge()||0)-gWaitAll();
+  return Math.max(0,Math.floor(min));
 }
 function renderInventory(){renderStock();}
 function stkTable(rows,fmt,today){
@@ -1964,17 +2048,18 @@ function renderStock(){
   /* ---- Greek ---- */
   var g=$('stkG');g.hidden=!hasG;
   if(hasG&&!(g.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
-    var gm=invMap();gt=gm.rows[today]||{start:invEnd(addDays(today,-1)),made:0,out:0,end:invEnd(today),counted:false};
-    gOn=S.prodDays.length||Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
-    var gp=greekProd(),gNext=batchDates()[0]||today,gFree=Math.max(0,stockFor(gNext,gp.name)-pcsOn(gNext,gp.name)),gSet=invMadeSet()[today];
-    g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gt.end<0?' neg':'')+'">'+(gOn?gFree+' <small>open for '+esc(gNext===today?'today':DOW[parseYmd(gNext).getDay()])+'</small>':'<small>Not counted yet</small>')+'</span></div>'
-      +(gOn?'<p class="muted small">Today: '+gt.start+' carried + '+(gt.made-invExpected(today))+' packed'+(invExpected(today)?' + '+invExpected(today)+' expected':'')+' − '+gt.out+' orders = <strong'+(gt.end<0?' class="neg"':'')+'>'+gt.end+' tonight</strong></p>':'<p class="muted small">Tap Fix a count and type the Greek tubs in your fridge.</p>')
+    var gF=gFridge(),gW=gWaitAll(),gp=greekProd(),gFree=gF==null?0:greekAvail(today,true),gTodayN=sum(gPackLog().filter(function(x){return ymd(new Date(x.at))===today;}),function(x){return Number(x.n)||0;});
+    gOn=gF!=null;gt={end:gF==null?0:gF-gW};
+    g.innerHTML='<div class="stkhead"><span class="stkname">Greek yogurt</span><span class="stkbig'+(gOn&&gF-gW<0?' neg':'')+'">'+(gOn?gFree+' <small>free now</small>':'<small>Not counted yet</small>')+'</span></div>'
+      +(gOn?'<div class="gsum"><span><b>'+gF+'</b> in the fridge</span><span>− <b>'+gW+'</b> waiting orders</span><span>= <b'+(gF-gW<0?' class="neg"':'')+'>'+(gF-gW)+'</b> free</span></div>'
+        +'<p class="muted small">Waiting orders still hold their tubs. When you check an order as sold, its tubs leave the fridge count.</p>'
+        :'<p class="muted small">Type how many Greek tubs are in your fridge under Fix a count to start.</p>')
       +'<div class="stkadd"><input id="gAdd" type="number" min="1" step="1" inputmode="numeric" placeholder="+ Packed" aria-label="Greek tubs packed today"><button type="button" class="btn small" data-act="stkadd" data-k="g">Add</button>'
-      +(gSet!=null?'<span class="muted small">'+gSet+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>'
-      +'<p class="muted small" style="margin-top:10px">Greek tubs you expect for Mon, Wed and Fri (total, before orders), then tap Save. Blank = only tubs already in the fridge.</p>'
+      +(gTodayN?'<span class="muted small">'+gTodayN+' packed today · <button type="button" class="stklink" data-act="stkundo" data-k="g">Undo</button></span>':'')+'</div>'
+      +'<p class="muted small" style="margin-top:10px">Extra Greek tubs you will make for Mon, Wed and Fri. The shop adds these on top of the fridge for that day. Blank = fridge only.</p>'
       +'<div class="stkdays">'+greekMWF().map(function(k,i){
         var ov=S.capacity.stock[k]&&typeof S.capacity.stock[k][gp.name]==='number'?S.capacity.stock[k][gp.name]:null,ord=pcsOn(k,gp.name),dd=parseYmd(k);
-        return '<div class="field"><label for="gday-'+i+'">'+DOW[dd.getDay()]+' '+(dd.getMonth()+1)+'/'+dd.getDate()+'</label><input id="gday-'+i+'" type="number" min="0" step="1" inputmode="numeric" data-gday="'+k+'" value="'+(ov==null?'':ov)+'"><span class="muted small">'+ord+' ordered · '+Math.max(0,stockFor(k,gp.name)-ord)+' left</span></div>';}).join('')+'</div>'
+        return '<div class="field"><label for="gday-'+i+'">'+DOW[dd.getDay()]+' '+(dd.getMonth()+1)+'/'+dd.getDate()+' extra</label><input id="gday-'+i+'" type="number" min="0" step="1" inputmode="numeric" data-gday="'+k+'" placeholder="0" value="'+(ov==null?'':ov)+'"><span class="muted small">'+ord+' ordered · '+greekAvail(k)+' free</span></div>';}).join('')+'</div>'
       +'<div class="stkadd"><button type="button" class="btn small" data-act="gdaysave">Save</button></div>';
   }
   /* ---- regular yogurt (liters) ---- */
@@ -1998,22 +2083,25 @@ function renderStock(){
   /* ---- Fix a count ---- */
   var fx=$('stkFix');
   if(!(fx.contains(document.activeElement)&&document.activeElement.tagName==='INPUT')){
-    var gl=invCounts()[today],yl=yogCounts()[today];
+    var gb=gFridgeBase(),gl=gb&&ymd(new Date(gb.at))===today?gb.n:null,yl=yogCounts()[today];
     fx.innerHTML='<div class="invcount">'
-      +(hasG?'<div class="field"><label for="gFix">Greek tubs left tonight</label><input id="gFix" type="number" min="0" step="1" inputmode="numeric" placeholder="'+(gt?gt.end:'')+'"></div>':'')
+      +(hasG?'<div class="field"><label for="gFix">Greek tubs in the fridge now</label><input id="gFix" type="number" min="0" step="1" inputmode="numeric" placeholder="'+(gFridge()==null?'':gFridge())+'"></div>':'')
       +(hasY?'<div class="field"><label for="yFix">Yogurt left tonight (L)</label><input id="yFix" type="number" min="0" step="0.1" inputmode="decimal" placeholder="'+(yt?r1(yt.end):'')+'"></div>':'')
       +'<button type="button" class="btn small" data-act="stkfixsave">Save</button>'+(gl!=null||yl!=null?'<button type="button" class="btn small quiet" data-act="stkfixundo">Undo today\'s count</button>':'')+'</div>'
-      +'<p class="muted small">Count what is in the fridge after today\'s orders are out. It replaces what Desk worked out, and tomorrow starts from it. Packed cups and drinks count as liters: 500 g = 0.5 L, a mini or a drink = 0.1 L. Leave a box blank to keep Desk\'s number.</p>';
+      +'<p class="muted small">Greek: count every tub in the fridge, including tubs set aside for orders you have not checked yet. Yogurt: count what is in the fridge after today\'s orders are out; tomorrow starts from it. Packed cups and drinks count as liters: 500 g = 0.5 L, a mini or a drink = 0.1 L. Leave a box blank to keep Desk\'s number.</p>';
   }
   /* ---- Next days ---- */
   var nx=$('stkNext'),html='';
-  if(hasG&&gOn)html+='<h3>Greek yogurt (tubs)</h3>'+stkTable(stkDays(invMap(),today),function(v){return v;},today);
+  if(hasG&&gOn){
+    var gRows=batchDates().slice(0,6).map(function(k){var gpn=greekProd().name,o=pcsOn(k,gpn),w=gWaitOn(k),x=gExtra(k);return '<tr class="'+(k===today?'today':'')+'"><td>'+esc(dateLabel(k))+'</td><td'+(x?'':' class="dim"')+'>'+(x?'+'+x:'0')+'</td><td'+(w?'':' class="dim"')+'>'+(w?w:'0')+'</td><td>'+greekAvail(k)+'</td></tr>';}).join('');
+    html+='<h3>Greek yogurt (tubs)</h3><div class="scroll"><table class="stocktbl invtbl"><thead><tr><th>Delivery</th><th>Extra</th><th>Waiting</th><th>Free</th></tr></thead><tbody>'+gRows+'</tbody></table></div>';
+  }
   if(hasY&&yOn){
     var bl={};yogLines(today).forEach(function(x){bl[x.product]=(bl[x.product]||0)+piecesOf(x);});
     var bk=Object.keys(bl).map(function(k){var kg=kgOf(k);return bl[k]+' × '+shortName(k)+' '+((/@\s*(.+)$/.exec(k)||[,''])[1])+' = '+(kg>0?fmtL(bl[k]*kg):'not counted (no kg set)');});
     html+='<h3>Yogurt &amp; drinks (liters)</h3>'+stkTable(stkDays(yogMap(),today),r1,today)+(bk.length?'<p class="muted small">Orders today: '+esc(bk.join(' · '))+'</p>':'');
   }
-  nx.innerHTML=html?html+'<p class="muted small">Greek and yogurt: the shop sells the tubs and liters you type for Mon, Wed and Fri on the Stock card; days you leave blank only use what is already in the fridge. Orders include online orders still waiting for approval. Start + made − orders = left, and what is left carries to the next day. Free = what is left after every upcoming order. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
+  nx.innerHTML=html?html+'<p class="muted small">Greek: free = fridge + extra tubs up to that day − orders you have not checked yet (online orders waiting for approval count too). Yogurt: start + made − orders = left, and what is left carries to the next day. A red number means more is promised than you have.</p>':'<p class="muted small">Nothing counted yet.</p>';
 }
 /* ---------- regular yogurt: liters for cups and drinks ---------- */
 function yogExpSet(){if(!S.yogExpect||typeof S.yogExpect!=='object')S.yogExpect={};return S.yogExpect;}
@@ -2082,7 +2170,7 @@ function yogMakesText(L){
 }
 function renderYogInventory(){}
 function stockFor(date,name){
-  var ov=S.capacity.stock[date];if(GREEK.test(name)&&ov&&typeof ov[name]==='number')return ov[name];
+  /* Greek: free tubs (fridge − unchecked orders + extras you typed) plus what is already pre-ordered for this day */
   if(GREEK.test(name))return greekAvail(date)+pcsOn(date,name);
   var o=S.capacity.stock[date];if(o&&typeof o[name]==='number')return o[name];
   if(isPool(name)&&yogExp(date)!=null)return Math.floor(yogFreeOn(date)/kgOf(name)+1e-9)+pcsOn(date,name);
@@ -2304,7 +2392,7 @@ function renderReserve(){
     $('resList').innerHTML=carHtml('res',slides,'batch');
     carInit('res');
   }
-  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt: type the tubs you expect for Mon, Wed and Fri on the Stock card (Production tab); the shop sells that minus orders, including ones waiting for approval. Days left blank only use tubs already in the fridge. For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
+  $('capNote').textContent='Customers pre-order for a delivery day. Greek yogurt: the shop sells the tubs in your fridge minus orders you have not checked as sold yet (including online orders waiting for approval), plus any extra tubs you type for a Mon, Wed or Fri on the Stock card (Production tab). For the other products, enter how many you make for each delivery day, or leave blank for no limit. Untick Deliver for a day you are closed. To deliver on Tue or Thu instead, use Reschedule on the order.';
   [0,1,2,3,4,5,6].forEach(function(d){var el=$('capw-'+d);if(el)el.checked=S.capacity.weekly[d]>0;});
   var tw=$('capTubsWeek');
   if(!tw.contains(document.activeElement)){
@@ -2317,7 +2405,7 @@ function renderReserve(){
     for(var i=0;i<14;i++){
       var d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()+i),k2=ymd(d),cap=capFor(k2),used=usedOn(k2),left=cap-used,over2=left<-0.001,pct=cap>0?Math.min(100,used/cap*100):(used>0?100:0),bn=batchName(k2);
       var sub=cap<=0?'No delivery':(over2?'Over by '+r1(-left)+' '+bw(-left):(stockRows(k2).length?'':'No products limited yet'));
-      if(!start&&cap>0)start=k2;slides.push({key:k2,one:true,label:dateLabel(k2),html:'<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g){var gov=S.capacity.stock[k2]&&typeof S.capacity.stock[k2][p.name]==='number'?S.capacity.stock[k2][p.name]:null;return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' (tubs, total for this day)</label><input id="'+id+'" type="number" min="0" step="1" inputmode="numeric" data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="'+(greekAvail(k2)+used3)+' (automatic)" value="'+(gov==null?'':gov)+'"><span class="muted small">'+used3+' pre-ordered'+(gov!=null?' · you set this; clear it to go back to automatic':'')+'</span></div>';}return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>'});
+      if(!start&&cap>0)start=k2;slides.push({key:k2,one:true,label:dateLabel(k2),html:'<div class="caprow"><div class="capd"><strong>'+esc(dateLabel(k2))+'</strong><span class="muted small">'+(cap>0?'Delivery day':'No delivery')+'</span></div><label class="small capon"><input type="checkbox" data-capon="'+k2+'"'+(cap>0?' checked':'')+' aria-label="Deliver on '+k2+'"> Deliver</label>'+(cap>0&&stockRows(k2).length?'<div class="stocksum small">'+stockSummary(k2,'')+'</div>':'')+(cap>0?'<details class="stockday" data-sd="'+k2+'"'+(stockOpen[k2]?' open':'')+'><summary>Change what is available for this delivery</summary><div class="inner"><div class="stockgrid">'+S.products.map(function(p){var g=GREEK.test(p.name),id='st-'+k2+'-'+S.products.indexOf(p),v=g?null:stockFor(k2,p.name),used3=pcsOn(k2,p.name);if(g){var gov=S.capacity.stock[k2]&&typeof S.capacity.stock[k2][p.name]==='number'?S.capacity.stock[k2][p.name]:null;return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' (extra tubs you will make)</label><input id="'+id+'" type="number" min="0" step="1" inputmode="numeric" data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="0" value="'+(gov==null?'':gov)+'"><span class="muted small">'+used3+' pre-ordered · '+greekAvail(k2)+' free</span></div>';}return '<div class="field"><label for="'+id+'">'+prodDot(p.name)+esc(shortName(p.name))+' ('+unitOf(p)+')</label><input id="'+id+'" type="number" min="'+(g?1:0)+'" step="1" inputmode="numeric" '+(g?'data-captubs="'+k2+'" placeholder="'+greekStock(k2,0)+' (automatic)"':'data-stockd="'+k2+'" data-pn="'+esc(p.name)+'" placeholder="Not limited"')+' value="'+(v==null?'':v)+'"><span class="muted small">'+used3+' pre-ordered</span></div>';}).join('')+'</div></div></details>':'')+'</div>'});
     }
     box.innerHTML='<span class="lbl" style="display:block;margin-top:14px">Change a single day</span><p class="muted small" style="margin:2px 0 8px">Only for exceptions: close one day, or change what is available for that day only.</p>'+carHtml('cap',slides,'day');
     carInit('cap',start);
@@ -2599,7 +2687,7 @@ document.addEventListener('click',function(e){
     /* Greek numbers typed earlier for other days (Tue, Thu, weekends) are cleared: those days use fridge tubs only */
     var td=ymd(new Date());Object.keys(S.capacity.stock).forEach(function(k){if(k<td)return;var dw=parseYmd(k).getDay(),so=S.capacity.stock[k];if([1,3,5].indexOf(dw)<0&&so&&gpn in so){delete so[gpn];if(!Object.keys(so).length)delete S.capacity.stock[k];}});
     if(bad){toast('Use whole numbers, 0 or more.');return;}
-    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Greek tubs saved.');}
+    saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Extra Greek tubs saved.');}
   else if(a==='ydaysave'){
     var ye=yogExpSet(),ybad=false;
     document.querySelectorAll('[data-yday]').forEach(function(el){var k=el.dataset.yday;if(el.value==='')delete ye[k];else if(Number(el.value)>=0)ye[k]=r2(Number(el.value));else ybad=true;});
@@ -2610,18 +2698,18 @@ document.addEventListener('click',function(e){
   else if(a==='stkadd'){
     var isG=t.dataset.k==='g',inp=$(isG?'gAdd':'yAdd'),av=Number(inp.value),ad=ymd(new Date());
     if(!(av>0)){toast(isG?'Type how many Greek tubs you packed.':'Type the liters you made.');inp.focus();return;}
-    var set=isG?invMadeSet():yogMadeSet();set[ad]=isG?Math.round((Number(set[ad])||0)+av):r2((Number(set[ad])||0)+av);
+    if(isG)gPackLog().push({at:Date.now(),n:Math.round(av)});else{var set=yogMadeSet();set[ad]=r2((Number(set[ad])||0)+av);}
     saveSettings();inp.value='';if(document.activeElement)document.activeElement.blur();renderAll();toast(isG?'Added '+Math.round(av)+' Greek tubs.':'Added '+r1(av)+' L.');}
-  else if(a==='stkundo'){var ud=ymd(new Date());delete (t.dataset.k==='g'?invMadeSet():yogMadeSet())[ud];saveSettings();renderAll();toast('Removed today\'s '+(t.dataset.k==='g'?'packed tubs.':'liters.'));}
+  else if(a==='stkundo'){var ud=ymd(new Date());if(t.dataset.k==='g')S.greekPacks=gPackLog().filter(function(x){return ymd(new Date(x.at))!==ud;});else delete yogMadeSet()[ud];saveSettings();renderAll();toast('Removed today\'s '+(t.dataset.k==='g'?'packed tubs.':'liters.'));}
   else if(a==='stkfixsave'){
     var fg=$('gFix'),fy=$('yFix'),fgv=fg?fg.value:'',fyv=fy?fy.value:'',fd=ymd(new Date());
     if(fgv===''&&fyv===''){toast('Type a count first.');return;}
     if((fgv!==''&&!(Number(fgv)>=0))||(fyv!==''&&!(Number(fyv)>=0))){toast('Use numbers, 0 or more.');return;}
     /* the count is what is left after today's orders; Desk stores it as today's starting point, so tubs packed later still add on top */
-    if(fgv!==''){delete invTotals()[fd];delete invLeft()[fd];delete invCounts()[fd];invCache=null;var gr=invMap().rows[fd],gmade=gr?gr.made:invMade(fd),gout=gr?gr.out:invOut(fd);invCounts()[fd]=Math.round(Number(fgv))-gmade+gout;}
+    if(fgv!==''){var ob=gFridgeBase();if(!ob||ymd(new Date(ob.at))!==fd)S.greekFridgePrev=ob||null;S.greekFridge={n:Math.round(Number(fgv)),at:Date.now()};}
     if(fyv!==''){delete yogTotals()[fd];delete yogLeft()[fd];delete yogCounts()[fd];yogCache=null;yogCounts()[fd]=r2(Number(fyv)-yogMade(fd)+yogOut(fd));}
     saveSettings();if(document.activeElement)document.activeElement.blur();renderAll();toast('Count saved.');}
-  else if(a==='stkfixundo'){var fu=ymd(new Date());delete invLeft()[fu];delete yogLeft()[fu];delete invCounts()[fu];delete yogCounts()[fu];delete invTotals()[fu];delete yogTotals()[fu];saveSettings();renderAll();toast('Today\'s count removed.');}
+  else if(a==='stkfixundo'){var fu=ymd(new Date()),fb=gFridgeBase();if(fb&&ymd(new Date(fb.at))===fu){S.greekFridge=S.greekFridgePrev||null;S.greekFridgePrev=null;}delete invLeft()[fu];delete yogLeft()[fu];delete invCounts()[fu];delete yogCounts()[fu];delete invTotals()[fu];delete yogTotals()[fu];saveSettings();renderAll();toast('Today\'s count removed.');}
   else if(a==='invsave'){
     var iv=$('invCount').value,mv=$('invMadeIn').value,td=ymd(new Date());
     if(iv===''&&mv===''){toast('Type Packed today, Left tonight, or both.');return;}
@@ -2764,6 +2852,7 @@ document.addEventListener('change',function(e){
 });
 
 $('startTime').addEventListener('change',function(){if(this.value){S.startTime=this.value;saveSettings();renderAll();}});
+$('packTime').addEventListener('change',function(){if(this.value){S.packTime=this.value;saveSettings();renderAll();}});
 $('bStart').addEventListener('input',function(){startTouched=true;var v=new Date(this.value).getTime();if(isFinite(v))$('bName').placeholder=weekBatchName(v);});
 $('mixOut').addEventListener('input',function(e){
   var t=e.target;if(!t.dataset||!t.dataset.mk)return;
@@ -2820,7 +2909,7 @@ function fieldsChanged(e){var id=e.target&&e.target.id;if(!id)return;
   if(id==='oMode'||id==='oFee'){syncMode('o');updateOrderTotal();}
   if(id==='rMode'||id==='rFee'){syncMode('r');updateResCheck();}Object.keys(FLID).forEach(function(px){if(FLID[px].indexOf(id)>=0)renderFlv(px);});}
 document.addEventListener('input',fieldsChanged);document.addEventListener('change',fieldsChanged);
-$('bookQ').addEventListener('input',renderBook);
+$('bookQ').addEventListener('input',function(){CAR.book=null;renderBook();});
 $('dayPick').addEventListener('change',function(){if(this.value){ordersDay=this.value;renderOrders();}});
 $('logoFile').addEventListener('change',function(){pickLogo(this.files&&this.files[0]);this.value='';});
 $('restoreFile').addEventListener('change',function(){readBackup(this.files&&this.files[0]);this.value='';});
@@ -3047,7 +3136,7 @@ function renderWebNotes(){
 /* today, for customers who want same-day pickup or delivery from what is already in the fridge (not from expected batches) */
 function todayOffer(){
   var k=ymd(new Date());if(capFor(k)>0)return null;
-  var left={},any=false,gt=invMap().rows[k],gReal=gt?gt.end-invExpected(k):0,g=Math.max(0,Math.min(greekAvail(k),gReal)),yl=yogActive()?yogAvail(k):0;
+  var left={},any=false,g=gFridge()==null?0:Math.min(greekAvail(k),greekAvail(k,true)),yl=yogActive()?yogAvail(k):0;
   S.products.forEach(function(p){var n=0;if(GREEK.test(p.name))n=g;else if(isPool(p.name))n=Math.floor(yl/kgOf(p.name)+1e-9);if(p.off)n=0;left[p.name]=Math.max(0,n);if(n>0)any=true;});
   return any?{date:k,label:'Today',left:left,sameDay:true,yogL:yl}:null;
 }
@@ -3274,9 +3363,14 @@ function startBy(G,deadline){
 }
 function needOf(G){
   if(G){
-    if(!greekProd())return null;
-    var gOn=S.prodDays.length||Object.keys(invCounts()).length||Object.keys(invLeft()).length||Object.keys(invTotals()).length||Object.keys(invMadeSet()).length||mem.batches.some(function(b){return tubsOf(b)>0;});
-    if(!gOn)return null;
+    if(!greekProd()||gFridge()==null)return null;
+    /* short = more unchecked orders than fridge + the bigger of (extras you typed, tubs from batches already running) */
+    var gr=runPlanned(true),gt=ymd(new Date()),rc=0,gworst=0,gfirst=null;
+    Object.keys(gr).forEach(function(k){if(k<gt)rc+=gr[k];});
+    gCurve(true).forEach(function(r){if(r.d>addDays(gt,7))return;rc+=gr[r.d]||0;var e=(gFridge()||0)+Math.max(r.ext,rc)-r.wait;if(e<0){if(!gfirst)gfirst=r.d;if(-e>gworst)gworst=-e;}});
+    if(!gfirst)return null;
+    var gper=Number(S.recipe.greekPerBatch)||4;
+    return {G:true,first:gfirst,short:Math.ceil(gworst),batches:Math.max(1,Math.ceil(gworst/gper-1e-6)),by:startBy(true,gfirst)};
   }else{
     if(!S.products.some(function(p){return isPool(p.name);})||!yogActive())return null;
   }
