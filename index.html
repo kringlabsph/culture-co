@@ -402,7 +402,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
       <ol class="steps">
         <li class="rv"><h3>Pre-order online</h3><p>Everything is pre-order. Pick your flavors and a delivery day, then pickup or delivery. Order by 5 PM the day before. You get a queue number and an order code right away.</p></li>
         <li class="rv d-1"><h3>We confirm your date</h3><p>We deliver on the days shown at the top of the page. We check what's left and confirm your date. Track it anytime with your code.</p></li>
-        <li class="rv d-2"><h3>Pickup or delivery</h3><p>We'll let you know when it's ready. Pickup is free: at our office on Mon, Wed and Fri, or at our house on Mon, Wed, Fri, Sat and Sun. Delivery adds ₱20.</p></li>
+        <li class="rv d-2"><h3>Pickup or delivery</h3><p>We'll let you know when it's ready. Pickup is free: at our office on Mon, Wed and Fri from 8 AM to 5 PM, or at our house on Mon, Wed, Fri, Sat and Sun. Delivery adds ₱20.</p></li>
       </ol>
     </div>
   </section>
@@ -416,7 +416,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
           <iframe title="Map to Culture Co. office pickup" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=6.744836,125.363372&amp;z=16&amp;output=embed"></iframe>
           <div class="sb"><h3>Office pickup</h3>
             <div class="days" aria-label="Pickup days"><span class="on">Mon</span><span>Tue</span><span class="on">Wed</span><span>Thu</span><span class="on">Fri</span><span>Sat</span><span>Sun</span></div>
-            <p class="small">We bring pickup orders to the office on Mon, Wed and Fri.</p>
+            <p class="small">We bring pickup orders to the office on Mon, Wed and Fri, <b>8 AM to 5 PM</b> only.</p>
             <a class="btn small" href="https://www.google.com/maps/search/?api=1&amp;query=6.744836,125.363372" target="_blank" rel="noopener">Open in Google Maps</a></div>
         </article>
         <article class="spot rv d-1">
@@ -466,7 +466,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
               <button type="button" id="sOffice" aria-pressed="true">Office</button>
               <button type="button" id="sHouse" aria-pressed="false">House</button>
             </div>
-            <p class="note" id="spotNote" style="margin-top:6px">Office: Mon, Wed, Fri. House: Mon, Wed, Fri, Sat, Sun. <a href="#pickup">See maps</a></p>
+            <p class="note" id="spotNote" style="margin-top:6px">Office: Mon, Wed, Fri, 8 AM to 5 PM. House: Mon, Wed, Fri, Sat, Sun. <a href="#pickup">See maps</a></p>
           </div>
           <div id="addrWrap" class="hide">
             <label for="addr">Delivery address</label>
@@ -569,7 +569,7 @@ const SITE = {
   storyText: [
     "Culture Co. is homemade. Every tub of cultured yogurt, Greek yogurt and cultured milk drink, in plain, strawberry and blueberry, is made in our home kitchen.",
     "We still work an 8 to 5 office job, so the yogurt is made and packed in the evenings, in small batches for what's already pre-ordered.",
-    "Pickup orders come with us to the office on Mon, Wed and Fri, or you can pick up at our house on Mon, Wed, Fri, Sat and Sun. Delivery is available too."
+    "Pickup orders come with us to the office on Mon, Wed and Fri, 8 AM to 5 PM, or you can pick up at our house on Mon, Wed, Fri, Sat and Sun. Delivery is available too."
   ],
   marquee: ["Naturally cultured", "Naturally good", "Order by 5 PM the day before", "Plain, strawberry and blueberry", "Pre-order only"],
 
@@ -584,7 +584,7 @@ const SITE = {
   faq: [
     ["When do you deliver?", "On the delivery days shown near the top of the page. Order by 5 PM the day before (weekend days stay open the evening before); when we have stock in the fridge you can also order for today until 5 PM. Each delivery day has a limited number of tubs, bottles and cups, shown near the top of the page."],
     ["When will I know my date?", "After you order, we confirm your pickup or delivery date. Check anytime with your order code in Track your order."],
-    ["Where do I pick up my order?", "Two spots: our office on Mon, Wed and Fri, or our house on Mon, Wed, Fri, Sat and Sun. Choose your spot when you order, and see the maps under Pickup."],
+    ["Where do I pick up my order?", "Two spots: our office on Mon, Wed and Fri from 8 AM to 5 PM, or our house on Mon, Wed, Fri, Sat and Sun. Choose your spot when you order, and see the maps under Pickup."],
     ["How much is delivery?", "Delivery adds ₱20 to your order. Pickup is free."],
     ["How do the sets of 3 work?", "Drinks and minis come in sets of 3 for ₱100. Mix any flavors in a set, for example 2 strawberry and 1 blueberry."],
     ["How do I store it?", "Keep refrigerated. Do not freeze."],
@@ -874,7 +874,7 @@ function setSpot(v){
   $("sOffice").setAttribute("aria-pressed", v === "office");
   $("sHouse").setAttribute("aria-pressed", v === "house");
   $("sOffice").disabled = !officeOk();
-  $("spotNote").firstChild.textContent = officeOk() ? "Office: Mon, Wed, Fri. House: Mon, Wed, Fri, Sat, Sun. " : "Office pickup is Mon, Wed and Fri only, so this day is house pickup. ";
+  $("spotNote").firstChild.textContent = officeOk() ? "Office: Mon, Wed, Fri, 8 AM to 5 PM. House: Mon, Wed, Fri, Sat, Sun. " : "Office pickup is Mon, Wed and Fri only, so this day is house pickup. ";
 }
 $("sOffice").onclick = () => setSpot("office");
 $("sHouse").onclick = () => setSpot("house");
