@@ -201,6 +201,18 @@ section{padding:110px 0}
 .how{background:var(--paper);position:relative;overflow:hidden}
 .how .wm{position:absolute;right:-120px;top:50%;width:520px;transform:translateY(-50%);opacity:.07;animation:spin 120s linear infinite}
 .how .wrap{position:relative;z-index:1}
+/* pickup spots */
+.spots{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}
+.spot{background:var(--milk);border:1px solid var(--line);border-radius:28px;overflow:hidden;display:flex;flex-direction:column}
+.spot iframe{display:block;width:100%;height:280px;border:0;background:var(--paper)}
+.spot .sb{padding:22px 24px 24px;display:flex;flex-direction:column;gap:8px}
+.spot h3{font-size:22px}
+.spot .days{display:flex;flex-wrap:wrap;gap:6px}
+.spot .days span{font:700 12px var(--sans);letter-spacing:.04em;padding:5px 10px;border-radius:999px;background:var(--paper);color:var(--ink-2)}
+.spot .days span.on{background:var(--forest);color:var(--milk)}
+.spot a.btn{align-self:flex-start;margin-top:6px}
+@media (max-width:760px){.spots{grid-template-columns:1fr}.spot iframe{height:220px}}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
 .steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:28px;position:relative;counter-reset:s}
 .steps li{counter-increment:s;background:var(--milk);border-radius:28px;padding:32px;border:1px solid var(--line)}
 .steps li::before{content:counter(s);display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--forest);color:var(--milk);font:400 24px var(--serif);margin-bottom:22px}
@@ -322,7 +334,7 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
   <div class="wrap">
     <a class="brand" href="#top" aria-label="Culture Co. home"><img src="img/mark.png" alt=""><span class="bname">Culture Co.</span></a>
     <nav aria-label="Main">
-      <a href="#menu">Menu</a><a href="#story">Our story</a><a href="#how">How it works</a><a href="#track">Track order</a><a href="#faq">FAQ</a>
+      <a href="#menu">Menu</a><a href="#story">Our story</a><a href="#how">How it works</a><a href="#pickup">Pickup</a><a href="#track">Track order</a><a href="#faq">FAQ</a>
     </nav>
     <a class="btn small cartbtn" href="#menu" id="cartBtn">Pre-order<span class="n" id="cartN">0</span></a>
   </div>
@@ -395,6 +407,29 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
     </div>
   </section>
 
+  <!-- PICKUP SPOTS -->
+  <section id="pickup" aria-labelledby="pickupTitle">
+    <div class="wrap">
+      <div class="sec-head rv"><div><h2 id="pickupTitle">Where to pick up</h2><p class="lead">Pickup is free. Choose your spot when you order, and we'll message you when it's ready.</p></div></div>
+      <div class="spots">
+        <article class="spot rv">
+          <iframe title="Map to Culture Co. office pickup" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=6.744836,125.363372&amp;z=16&amp;output=embed"></iframe>
+          <div class="sb"><h3>Office pickup</h3>
+            <div class="days" aria-label="Pickup days"><span class="on">Mon</span><span>Tue</span><span class="on">Wed</span><span>Thu</span><span class="on">Fri</span><span>Sat</span><span>Sun</span></div>
+            <p class="small">We bring pickup orders to the office on Mon, Wed and Fri.</p>
+            <a class="btn small" href="https://www.google.com/maps/search/?api=1&amp;query=6.744836,125.363372" target="_blank" rel="noopener">Open in Google Maps</a></div>
+        </article>
+        <article class="spot rv d-1">
+          <iframe title="Map to Culture Co. house pickup" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=6.755672,125.367914&amp;z=16&amp;output=embed"></iframe>
+          <div class="sb"><h3>House pickup</h3>
+            <div class="days" aria-label="Pickup days"><span class="on">Mon</span><span>Tue</span><span class="on">Wed</span><span>Thu</span><span class="on">Fri</span><span class="on">Sat</span><span class="on">Sun</span></div>
+            <p class="small">Pick up at our house on Mon, Wed, Fri, Sat and Sun.</p>
+            <a class="btn small" href="https://www.google.com/maps/search/?api=1&amp;query=6.755672,125.367914" target="_blank" rel="noopener">Open in Google Maps</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
   <!-- BAND -->
   <div class="band">
     <div class="ph"><img src="img/flatlay.jpg" alt="Culture Co. milk drink bottles and yogurt cups in plain, strawberry and blueberry"></div>
@@ -424,6 +459,14 @@ footer small{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.15);padding
           <div class="seg" role="group" aria-labelledby="fLabel">
             <button type="button" id="fPick" aria-pressed="true">Pickup</button>
             <button type="button" id="fDel" aria-pressed="false">Delivery +₱20</button>
+          </div>
+          <div id="spotWrap">
+            <label id="sLabel">Pickup spot</label>
+            <div class="seg" role="group" aria-labelledby="sLabel">
+              <button type="button" id="sOffice" aria-pressed="true">Office</button>
+              <button type="button" id="sHouse" aria-pressed="false">House</button>
+            </div>
+            <p class="note" id="spotNote" style="margin-top:6px">Office: Mon, Wed, Fri. House: Mon, Wed, Fri, Sat, Sun. <a href="#pickup">See maps</a></p>
           </div>
           <div id="addrWrap" class="hide">
             <label for="addr">Delivery address</label>
@@ -541,7 +584,7 @@ const SITE = {
   faq: [
     ["When do you deliver?", "On the delivery days shown near the top of the page. Order by 5 PM the day before (weekend days stay open the evening before); when we have stock in the fridge you can also order for today until 5 PM. Each delivery day has a limited number of tubs, bottles and cups, shown near the top of the page."],
     ["When will I know my date?", "After you order, we confirm your pickup or delivery date. Check anytime with your order code in Track your order."],
-    ["Where do I pick up my order?", "Two spots: our office on Mon, Wed and Fri, or our house on Mon, Wed, Fri, Sat and Sun. Tell us which one in your order notes, and we'll message you the details when it's ready."],
+    ["Where do I pick up my order?", "Two spots: our office on Mon, Wed and Fri, or our house on Mon, Wed, Fri, Sat and Sun. Choose your spot when you order, and see the maps under Pickup."],
     ["How much is delivery?", "Delivery adds ₱20 to your order. Pickup is free."],
     ["How do the sets of 3 work?", "Drinks and minis come in sets of 3 for ₱100. Mix any flavors in a set, for example 2 strawberry and 1 blueberry."],
     ["How do I store it?", "Keep refrigerated. Do not freeze."],
@@ -804,6 +847,7 @@ function calc(){
 const lineText = it => `${it.pack ? `${it.qty} set${it.qty === 1 ? "" : "s"} of ${it.pack}` : `${it.qty}×`} ${title(it.product)} ${sizeOf(it.product)}${it.flavors ? ` (${Object.entries(it.flavors).map(([f,n]) => n > 1 ? `${f} ×${n}` : f).join(", ")})` : ""}`;
 let orderInView = false;
 function update(){
+  if (typeof setSpot === "function") setSpot(spot);
   const c = calc();
   $("count").textContent = `${c.pieces} item${c.pieces === 1 ? "" : "s"}`;
   $("sum").textContent = peso(c.total);
@@ -821,8 +865,23 @@ function update(){
 }
 new IntersectionObserver(es => { orderInView = es[0].isIntersecting; update(); }, { threshold: .1 }).observe($("order"));
 
+/* office pickup is Mon/Wed/Fri only; other days switch to the house */
+let spot = "office";
+const officeOk = () => !selBatch || [1,3,5].includes(new Date(selBatch + "T00:00").getDay());
+function setSpot(v){
+  if (v === "office" && !officeOk()) v = "house";
+  spot = v;
+  $("sOffice").setAttribute("aria-pressed", v === "office");
+  $("sHouse").setAttribute("aria-pressed", v === "house");
+  $("sOffice").disabled = !officeOk();
+  $("spotNote").firstChild.textContent = officeOk() ? "Office: Mon, Wed, Fri. House: Mon, Wed, Fri, Sat, Sun. " : "Office pickup is Mon, Wed and Fri only, so this day is house pickup. ";
+}
+$("sOffice").onclick = () => setSpot("office");
+$("sHouse").onclick = () => setSpot("house");
+const spotName = () => spot === "office" ? "Office pickup" : "House pickup";
 function setFulfilment(v){
   fulfilment = v;
+  $("spotWrap").classList.toggle("hide", v !== "pickup");
   $("fPick").setAttribute("aria-pressed", v === "pickup");
   $("fDel").setAttribute("aria-pressed", v === "delivery");
   $("addrWrap").classList.toggle("hide", v !== "delivery");
@@ -861,7 +920,7 @@ $("submit").onclick = () => {
   $("cfPhone").textContent = phNice(d.phone);
   $("cfFb").textContent = d.fb; $("cfFbWrap").classList.toggle("hide", !d.fb);
   $("cfModeL").textContent = del ? "Delivery to" : "Pickup";
-  $("cfMode").textContent = del ? d.addr : "Free pickup";
+  $("cfMode").textContent = del ? d.addr : spotName() + " (free)";
   $("cfBatch").textContent = selBatch ? fmtShort(selBatch) : "Next available";
   $("cfNotes").textContent = d.notes; $("cfNotesWrap").classList.toggle("hide", !d.notes);
   $("cfLines").innerHTML = c.items.map(i => `<div class="row"><span>${esc(lineText(i))}</span><span>${peso(i.qty * i.price)}</span></div>`).join("")
@@ -878,7 +937,7 @@ $("cfGo").onclick = async () => {
   if (!store){ $("cfErr").textContent = "Still connecting. Wait a moment and confirm again."; return; }
   $("cfGo").disabled = true; $("cfBack").disabled = true; $("cfGo").textContent = "Sending…";
   try {
-    const notes = [d.fb ? `Messenger: ${d.fb}` : "", d.notes].filter(Boolean).join(" · ");
+    const notes = [fulfilment === "pickup" ? spotName() : "", d.fb ? `Messenger: ${d.fb}` : "", d.notes].filter(Boolean).join(" · ");
     const r = await store.createOrder({ name: d.name, contact: phNice(d.phone), fulfilment, address: fulfilment === "delivery" ? d.addr : "",
       notes, items: c.items, subtotal: c.subtotal, deliveryFee: c.fee, total: c.total,
       preferredBatch: selBatch || null });
